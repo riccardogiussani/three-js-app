@@ -40,7 +40,7 @@ camera.position.z = 5;
 let loadedModel: THREE.Group | null = null;
 
 const loader = new GLTFLoader();
-const modelPath = '/models/warehouse.glb';
+const modelPath = './models/warehouse.glb';
 
 loader.load(
   modelPath,
