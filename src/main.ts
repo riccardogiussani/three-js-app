@@ -3,6 +3,8 @@
 // will handle this 'import' process.
 import * as THREE from 'three'; 
 
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
 // Import GLTFLoader from three-stdlib (or three/examples/jsm/loaders/GLTFLoader)
 // For simplicity and common practice, we'll use the standard import path here which works well with Vite.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -34,6 +36,83 @@ scene.add(directionalLight);
 
 // Position the camera so it can see the cube
 camera.position.z = 5;
+
+const controllerLoader = new GLTFLoader();
+const controllerModelFactory = new XRControllerModelFactory(controllerLoader);
+/*
+ Definition of controller 0
+ - Controller 0 (corresponds to targetRaySpace)
+ - Controller Grip 0 (corresponds to gripSpace)
+*/
+const controller0 = renderer.xr.getController(0);
+scene.add(controller0);
+const controllerGrip0 = renderer.xr.getControllerGrip(0);
+const model0 = controllerModelFactory.createControllerModel(controllerGrip0);
+controllerGrip0.add(model0); 
+scene.add(controllerGrip0);
+
+// Helpers to construct rayLine object
+const rayGeometry0 = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),      
+    new THREE.Vector3(0, 0, -1)     
+]);
+const rayMaterial0 = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+const rayLine0 = new THREE.Line(rayGeometry0, rayMaterial0);
+rayLine0.scale.z = 20; // Make it a long ray
+controller0.add(rayLine0);
+
+controller0.addEventListener('selectstart', onSelectStart0);
+controller0.addEventListener('selectend', onSelectEnd0);
+controller0.addEventListener('squeezestart', onSqueezeStart0);
+controller0.addEventListener('squeezeend', onSqueezeEnd0);
+
+function onSelectStart0(event: THREE.Event) {
+    console.log('Controller 0 (Target Ray) - Select Button Pressed!');
+    // Example: Make the ray line red on press
+    rayLine0.material.color.setHex(0xff0000); 
+}
+
+function onSelectEnd0(event: THREE.Event) {
+    console.log('Controller 0 (Target Ray) - Select Button Released!');
+    // Example: Revert the ray line color
+    rayLine0.material.color.setHex(0xffffff);
+}
+
+function onSqueezeStart0(event: THREE.Event) {
+    console.log('Controller 0 (Target Ray) - Squeeze/Grip Button Pressed!');
+    // Add logic for grabbing or other actions
+    cube.material.color.setHex(0x0000ff); // Change cube color on grip
+}
+
+function onSqueezeEnd0(event: THREE.Event) {
+    console.log('Controller 0 (Target Ray) - Squeeze/Grip Button Released!');
+    cube.material.color.setHex(0x00ff00); // Revert cube color
+}
+
+/*
+ Definition of controller 1
+ - Controller 1 (corresponds to targetRaySpace)
+ - Controller Grip 1 (corresponds to gripSpace)
+*/
+const controller1 = renderer.xr.getController(1);
+scene.add(controller1); 
+const controllerGrip1 = renderer.xr.getControllerGrip(1);
+const model1 = controllerModelFactory.createControllerModel(controllerGrip1);
+controllerGrip1.add(model1);
+scene.add(controllerGrip1);
+
+// Helpers to construct rayLine object
+const rayGeometry1 = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),      
+    new THREE.Vector3(0, 0, -1)     
+]);
+const rayMaterial1 = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+const rayLine1 = new THREE.Line(rayGeometry1, rayMaterial1);
+rayLine1.scale.z = 20; // Make it a long ray
+controller1.add(rayLine1);
+
 
 // Variable to hold the loaded model
 let loadedModel: THREE.Group | null = null;
