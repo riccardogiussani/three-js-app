@@ -5,9 +5,111 @@
     <style>
         body { margin: 0; }
         canvas { display: block; } /* Removes scrollbars */
-    </style>
-<script type="module" src="./src/main.ts" defer></script></head>
-<body>
-    </body>
-</html>
 
+        /* Styles for the WebXR button */
+        #xr-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 100; /* Ensure it's above the canvas */
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+        #xr-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    <script type="module" src="./src/main.ts" defer></script>
+</head>
+<body>
+    <button id="xr-button" disabled>VR Not Available</button>
+
+    <script type="module">
+        // Import a reference to the WebGL context and session management from main.ts
+        import { startVRSession, endVRSession } from './src/main.ts';
+
+        let xrSession = null;
+        const xrButton = document.getElementById('xr-button');
+
+        /**
+         * Checks for immersive-vr support and updates the button state.
+         */
+        async function checkVRSupport() {
+            if (!navigator.xr) {
+                console.log("WebXR not available.");
+                return;
+            }
+
+            const supported = await navigator.xr.isSessionSupported('immersive-vr');
+            
+            if (supported) {
+                xrButton.textContent = 'Start VR';
+                xrButton.disabled = false;
+                xrButton.addEventListener('click', onButtonClicked);
+            } else {
+                xrButton.textContent = 'VR Not Supported';
+            }
+        }
+
+        /**
+         * Handles the button click to start or stop the VR session.
+         */
+        async function onButtonClicked() {
+            if (xrSession) {
+                // Shutting down the session
+                // The end event handler will reset the button text.
+                await xrSession.end();
+            } else {
+                // Starting the session
+                try {
+                    const xr = navigator.xr;
+                    if (!xr) return;
+
+                    // 1. Request the immersive-vr session
+                    // We can specify requiredFeatures, e.g., 'local' or 'local-floor'
+                    xrSession = await xr.requestSession('immersive-vr', {
+                        optionalFeatures: ['local-floor', 'hand-tracking']
+                    });
+
+                    // 2. Add an event listener for clean shutdown
+                    xrSession.addEventListener('end', onSessionEnd);
+
+                    // 3. Update button state
+                    xrButton.textContent = 'Exit VR';
+
+                    // 4. Pass the session to the Three.js setup
+                    // This is where you'd call your Three.js logic to set up the XRSession.
+                    await startVRSession(xrSession);
+
+                } catch (error) {
+                    console.error("Failed to start XR session:", error);
+                    xrSession = null; // Ensure the session reference is cleared on error
+                    xrButton.textContent = 'Start VR';
+                }
+            }
+        }
+
+        /**
+         * Cleans up when the session ends (manually or by system).
+         */
+        function onSessionEnd() {
+            console.log("XR Session ended.");
+            xrSession = null;
+            xrButton.textContent = 'Start VR';
+            // Call main.ts function to clean up Three.js resources
+            endVRSession();
+        }
+
+        // Start the check when the page loads
+        checkVRSupport();
+
+    </script>
+</body>
+</html>

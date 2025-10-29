@@ -6,8 +6,6 @@ import * as THREE from 'three';
 // Import GLTFLoader from three-stdlib (or three/examples/jsm/loaders/GLTFLoader)
 // For simplicity and common practice, we'll use the standard import path here which works well with Vite.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-//import { USDZLoader } from 'three/addons/loaders/USDZLoader.js';
-
 
 // 1. Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -18,6 +16,7 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 // Renderer
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 // 2. Add an Object to the Scene (e.g., a simple cube)
@@ -40,7 +39,7 @@ camera.position.z = 5;
 let loadedModel: THREE.Group | null = null;
 
 const loader = new GLTFLoader();
-const modelPath = './models/warehouse.glb';
+const modelPath = './models/warehouse.glb'; 
 
 loader.load(
   modelPath,
@@ -50,7 +49,7 @@ loader.load(
 
     // Scale, position, or rotate the model as needed
     // Example: Make the model a bit smaller and center it
-    loadedModel.scale.set(1, 1, 1);
+    loadedModel.scale.set(0.01, 0.01, 0.01);
     loadedModel.position.set(0, 0, 0);
 
     scene.add(loadedModel);
@@ -66,10 +65,33 @@ loader.load(
   }
 );
 
-// 3. Create the Animate/Render Loop
-function animate() {
-    requestAnimationFrame(animate);
+/*
+ Called by index.html when the 'Start VR' button is clicked.
+ It initiates the WebXR immersive-vr session.
+ @param session The XRSession object received from navigator.xr.requestSession.
+*/
+export async function startVRSession(session: XRSession): Promise<void> {
+    console.log("Starting VR Session...");
+    // 1. Inform the Three.js XR manager about the new session
+    await renderer.xr.setSession(session);
+    // 2. Set background color to black for VR mode
+    renderer.setClearColor(0x000000);
+}
 
+/*
+ Called by index.html when the XRSession 'end' event is fired.
+ It handles cleanup specific to exiting the XR experience.
+*/
+export function endVRSession(): void {
+    console.log("Ending VR Session cleanup...");
+    // Revert background color for inline mode
+    renderer.setClearColor(0x000000); // Reverting to black, or any default background color
+}
+
+// 3. Create the Animate/Render Loop
+//function animate() {
+    //requestAnimationFrame(animate);
+function animate(time?: number) { // time is automatically passed in when using setAnimationLoop
     // Animation logic
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
@@ -89,4 +111,5 @@ window.addEventListener('resize', () => {
 });
 
 // Start the animation loop
-animate();
+//animate();
+renderer.setAnimationLoop(animate);
