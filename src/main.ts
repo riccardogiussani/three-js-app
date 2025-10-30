@@ -68,25 +68,25 @@ controller0.addEventListener('squeezestart', onSqueezeStart0);
 controller0.addEventListener('squeezeend', onSqueezeEnd0);
 
 function onSelectStart0(event: THREE.Event) {
-    console.log('Controller 0 (Target Ray) - Select Button Pressed!');
+    console.log(`Controller 0 (Target Ray) - Select Button Pressed! ${event}`);
     // Example: Make the ray line red on press
     rayLine0.material.color.setHex(0xff0000); 
 }
 
 function onSelectEnd0(event: THREE.Event) {
-    console.log('Controller 0 (Target Ray) - Select Button Released!');
+    console.log(`Controller 0 (Target Ray) - Select Button Released! ${event}`);
     // Example: Revert the ray line color
     rayLine0.material.color.setHex(0xffffff);
 }
 
 function onSqueezeStart0(event: THREE.Event) {
-    console.log('Controller 0 (Target Ray) - Squeeze/Grip Button Pressed!');
+    console.log(`Controller 0 (Target Ray) - Squeeze/Grip Button Pressed! ${event}`);
     // Add logic for grabbing or other actions
     cube.material.color.setHex(0x0000ff); // Change cube color on grip
 }
 
 function onSqueezeEnd0(event: THREE.Event) {
-    console.log('Controller 0 (Target Ray) - Squeeze/Grip Button Released!');
+    console.log(`Controller 0 (Target Ray) - Squeeze/Grip Button Released! ${event}`);
     cube.material.color.setHex(0x00ff00); // Revert cube color
 }
 
@@ -175,6 +175,7 @@ function animate(time?: number) { // time is automatically passed in when using 
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
+    console.log(time);
     // Render the scene from the camera's perspective
     renderer.render(scene, camera);
 }
