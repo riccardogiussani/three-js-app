@@ -175,7 +175,6 @@ function animate(time?: number) { // time is automatically passed in when using 
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
-    console.log(time);
     // Render the scene from the camera's perspective
     renderer.render(scene, camera);
 }
