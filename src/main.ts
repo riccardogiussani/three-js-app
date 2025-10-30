@@ -21,12 +21,13 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
+/*
 // 2. Add an Object to the Scene (e.g., a simple cube)
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 const cube = new THREE.Mesh(geometry, material);
 scene.add(cube);
-
+*/
 // Add lighting (important for models!)
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -39,6 +40,7 @@ camera.position.z = 5;
 
 const controllerLoader = new GLTFLoader();
 const controllerModelFactory = new XRControllerModelFactory(controllerLoader);
+
 /*
  Definition of controller 0
  - Controller 0 (corresponds to targetRaySpace)
@@ -82,12 +84,12 @@ function onSelectEnd0(event: THREE.Event) {
 function onSqueezeStart0(event: THREE.Event) {
     console.log(`Controller 0 (Target Ray) - Squeeze/Grip Button Pressed! ${event}`);
     // Add logic for grabbing or other actions
-    cube.material.color.setHex(0x0000ff); // Change cube color on grip
+    //cube.material.color.setHex(0x0000ff); // Change cube color on grip
 }
 
 function onSqueezeEnd0(event: THREE.Event) {
     console.log(`Controller 0 (Target Ray) - Squeeze/Grip Button Released! ${event}`);
-    cube.material.color.setHex(0x00ff00); // Revert cube color
+    //cube.material.color.setHex(0x00ff00); // Revert cube color
 }
 
 /*
@@ -113,35 +115,45 @@ const rayLine1 = new THREE.Line(rayGeometry1, rayMaterial1);
 rayLine1.scale.z = 20; // Make it a long ray
 controller1.add(rayLine1);
 
-
 // Variable to hold the loaded model
-let loadedModel: THREE.Group | null = null;
+//let loadedModel: THREE.Group | null = null;
 
 const loader = new GLTFLoader();
 const modelPath = './models/warehouse.glb'; 
 
+let meshes;
+
+// Load a glTF resource
 loader.load(
-  modelPath,
-  function (gltf) {
-    // Successfully loaded the model
-    loadedModel = gltf.scene;
+	// resource URL
+	modelPath,
+	// called when the resource is loaded
+	function ( gltf ) {
 
-    // Scale, position, or rotate the model as needed
-    // Example: Make the model a bit smaller and center it
-    loadedModel.scale.set(0.01, 0.01, 0.01);
-    loadedModel.position.set(0, 0, 0);
+		scene.add( gltf.scene );
 
-    scene.add(loadedModel);
-    console.log('Model loaded successfully!');
-  },
-  // Optional: Function to track loading progress
-  function (xhr) {
-    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-  },
-  // Optional: Function to handle errors
-  function (error) {
-    console.error('An error occurred while loading the model', error);
-  }
+		//console.log(gltf.animations); // Array<THREE.AnimationClip>
+		//console.log(gltf.scene); // THREE.Group
+		//console.log(gltf.scenes); // Array<THREE.Group>
+		//console.log(gltf.cameras); // Array<THREE.Camera>
+		//console.log(gltf.asset); // Object
+
+        meshes = scene.getObjectsByProperty('isMesh', true);
+        console.log('Meshes: ');
+        console.log(meshes);
+	},
+	// called while loading is progressing
+	function ( xhr ) {
+
+		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+
+	},
+	// called when loading has errors
+	function ( error ) {
+
+		console.log( 'An error happened' );
+
+	}
 );
 
 /*
@@ -172,8 +184,8 @@ export function endVRSession(): void {
     //requestAnimationFrame(animate);
 function animate(time?: number) { // time is automatically passed in when using setAnimationLoop
     // Animation logic
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
+    //cube.rotation.x += 0.01;
+    //cube.rotation.y += 0.01;
 
     // Render the scene from the camera's perspective
     renderer.render(scene, camera);
