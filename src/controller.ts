@@ -1,7 +1,7 @@
-// controller.ts
+// controller.ts (Modified)
 
 import * as THREE from 'three';
-import { WebGLRenderer } from 'three'; // Import specific types for clarity
+import { WebGLRenderer } from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -9,12 +9,22 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 interface ControllerRefs {
     controller0: THREE.XRTargetRaySpace;
     rayLine0: THREE.Line;
+    controllerGrip0: THREE.XRTargetRaySpace;
+    selectionSphere0: THREE.Mesh;
+
     controller1: THREE.XRTargetRaySpace;
     rayLine1: THREE.Line;
+    controllerGrip1: THREE.XRTargetRaySpace;
+    selectionSphere1: THREE.Mesh;
 }
 
 // Function to set up a single controller
-function setupController(index: number, renderer: WebGLRenderer, scene: THREE.Scene, controllerModelFactory: XRControllerModelFactory): { controller: THREE.XRTargetRaySpace, rayLine: THREE.Line } {
+function setupController(index: number, renderer: WebGLRenderer, scene: THREE.Scene, controllerModelFactory: XRControllerModelFactory): { 
+    controller: THREE.XRTargetRaySpace, 
+    rayLine: THREE.Line,
+    controllerGrip: THREE.XRTargetRaySpace,
+    selectionSphere: THREE.Mesh
+} {
     const controller:THREE.XRTargetRaySpace = renderer.xr.getController(index);
     scene.add(controller);
 
@@ -34,35 +44,19 @@ function setupController(index: number, renderer: WebGLRenderer, scene: THREE.Sc
     rayLine.scale.z = 20; // Make it a long ray
     controller.add(rayLine);
 
-    // --- Controller Event Handlers (can be defined outside or inside) ---
-    /*
-    function onSelectStart(event: THREE.Event) {
-        console.log(`Controller ${index} - Select Button Pressed!`);
-        // Use the captured rayLine for visual feedback
-        rayLine.material.color.setHex(0xff0000); 
-    }
+    // A small sphere used for intersection checks
+    const sphereGeometry = new THREE.SphereGeometry(0.01, 8, 8);
+    // Red, wireframe material for visibility
+    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff /*, wireframe: true*/ }); 
+    const selectionSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    
+    // Position it slightly forward from the grip origin
+    selectionSphere.position.set(0, 0, -0.03); 
+    
+    // Add the sphere to the GRIP, so it moves with the hand model
+    controller.add(selectionSphere);
 
-    function onSelectEnd(event: THREE.Event) {
-        console.log(`Controller ${index} - Select Button Released!`);
-        rayLine.material.color.setHex(0xffffff);
-    }
-    
-    function onSqueezeStart(event: THREE.Event) {
-        console.log(`Controller ${index} - Squeeze/Grip Button Pressed!`);
-        // Add game logic here, e.g., grabbing objects
-    }
-    
-    function onSqueezeEnd(event: THREE.Event) {
-        console.log(`Controller ${index} - Squeeze/Grip Button Released!`);
-    }
-    */
-    /*
-    controller.addEventListener('selectstart', onSelectStart);
-    controller.addEventListener('selectend', onSelectEnd);
-    controller.addEventListener('squeezestart', onSqueezeStart);
-    controller.addEventListener('squeezeend', onSqueezeEnd);
-    */
-    return { controller, rayLine };
+    return { controller, rayLine, controllerGrip, selectionSphere };
 }
 
 /**
@@ -76,13 +70,23 @@ export function createControllers(renderer: WebGLRenderer, scene: THREE.Scene): 
     const controllerModelFactory = new XRControllerModelFactory(controllerLoader);
 
     // Setup Controller 0
-    const { controller: controller0, rayLine: rayLine0 } = setupController(0, renderer, scene, controllerModelFactory);
+    const { 
+        controller: controller0, 
+        rayLine: rayLine0, 
+        controllerGrip: controllerGrip0, 
+        selectionSphere: selectionSphere0 
+    } = setupController(0, renderer, scene, controllerModelFactory);
 
     // Setup Controller 1
-    const { controller: controller1, rayLine: rayLine1 } = setupController(1, renderer, scene, controllerModelFactory);
+    const { 
+        controller: controller1, 
+        rayLine: rayLine1, 
+        controllerGrip: controllerGrip1, 
+        selectionSphere: selectionSphere1 
+    } = setupController(1, renderer, scene, controllerModelFactory);
     
-    // Note: If you want controller 1 to have different handlers, 
-    // you would either pass them in, or define a more advanced class/config.
-
-    return { controller0, rayLine0, controller1, rayLine1 };
+    return { 
+        controller0, rayLine0, controllerGrip0, selectionSphere0,
+        controller1, rayLine1, controllerGrip1, selectionSphere1
+    };
 }
