@@ -27,10 +27,13 @@ const rayDirections = [
  * @returns The closest intersecting mesh that also passes the AABB check, or null.
  */
 export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THREE.Mesh | null {
-    // 1. Get the world position of the sphere center (our ray origin)
+    // Get the world position of the sphere center (our ray origin)
     sphere.updateWorldMatrix(true, false);
     const sphereOrigin = new THREE.Vector3();
     sphere.getWorldPosition(sphereOrigin);
+
+    // Get the radius of the sphere (FIXED: accessing sphere.radius is invalid)
+    const sphereRadius = getSphereRadius(sphere);
 
     let closestHit: THREE.Intersection | null = null;
     let closestMesh: THREE.Mesh | null = null;
@@ -38,16 +41,15 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
     
     // We want to return the mesh that is both AABB intersecting AND has the closest ray hit.
     
-    // 2. Iterate through all grabbable meshes to find candidates
+    // Iterate through all grabbable meshes to find candidates
     for (const mesh of meshes) {
         mesh.updateWorldMatrix(true, false);
         
-        // --- AABB Check ---
-        // Does the sphere's center fall within the mesh's AABB?
+        // Does the sphere's center fall within the mesh's bounding box?
         meshBoundingBox.setFromObject(mesh);
         
         if (meshBoundingBox.containsPoint(sphereOrigin)) {
-            // AABB Check Passed: This mesh is a candidate. Now, cast rays to find the closest point of entry/exit.
+            // This mesh is a candidate. Now, cast rays to find the closest point of entry/exit.
             
             // 3. Raycast in 6 directions from the sphere center
             for (const directionVector of rayDirections) {
@@ -58,12 +60,21 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
                 const intersects = raycaster.intersectObject(mesh, false);
 
                 if (intersects.length > 0) {
-                    const hit = intersects[0];
-                    // 4. Find the closest raycast hit distance among all rays for this mesh
-                    if (hit.distance < minDistance) {
-                        minDistance = hit.distance;
-                        closestHit = hit;
-                        closestMesh = mesh;
+                    if (intersects.length % 2 !== 0) { // If number of hits is odd (starting inside)
+                        const hit = intersects[0];
+                        // Find the closest raycast hit distance among all rays for this mesh
+                        if (hit.distance < minDistance) {
+                            minDistance = hit.distance;
+                            closestHit = hit;
+                            closestMesh = mesh;
+                        }
+                    } else { // If number of hits is even (starting outside)
+                        const hit = intersects[0];
+                        if (hit.distance < minDistance && hit.distance < sphereRadius) {
+                            minDistance = hit.distance;
+                            closestHit = hit;
+                            closestMesh = mesh;
+                        }
                     }
                 }
             }
@@ -72,6 +83,17 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
 
     // Return the closest mesh found that passed the AABB check
     return closestMesh;
+}
+
+function getSphereRadius(sphere: THREE.Mesh): number {
+    const boundingSphere = new THREE.Sphere();
+    // Calculate the bounding sphere in local space
+    if (sphere.geometry.boundingSphere === null) {
+        sphere.geometry.computeBoundingSphere();
+    }
+    boundingSphere.copy(sphere.geometry.boundingSphere!);
+    // Apply the mesh's scale to the radius
+    return boundingSphere.radius * sphere.scale.x; // Assumes uniform scaling
 }
 
 /**
@@ -139,7 +161,7 @@ export function iterativeSelectParent(
     
     // 2. If the current selected object is the intersected mesh, cycle back to the root.
     if (selectedObject === intersectedMesh) {
-        return findModelRoot(intersectedMesh);
+        return selectedObject; //findModelRoot(intersectedMesh);
     }
 
     // 3. Otherwise, we move one level deeper (downstream) towards the intersected mesh.
