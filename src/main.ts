@@ -1,8 +1,13 @@
-// main.ts (Modified)
+// main.ts (Refactored)
 
 import * as THREE from 'three'; 
 import { createControllers } from './controller.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { 
+    checkIntersection, 
+    setHighlight, 
+    iterativeSelectParent
+} from './utils.ts';
 
 // 1. Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -31,13 +36,13 @@ const grabbableMeshes: THREE.Mesh[] = [];
  * The object currently "selected" by the 'select' (trigger) button.
  * It is not yet grabbed.
  */
-let selectedObject: THREE.Mesh | null = null;
+let selectedObject: THREE.Object3D | null = null; // Changed type to Object3D to handle parent groups
 
 /**
  * The object currently "grabbed" by the 'squeeze' (grip) button.
  * This object is attached to the controller.
  */
-let grabbedObject: THREE.Mesh | null = null;
+let grabbedObject: THREE.Object3D | null = null; // Changed type to Object3D
 
 
 // Get all controller references, including the new grips and spheres
@@ -57,55 +62,62 @@ controller0.addEventListener('selectend', onSelectEnd0);
 controller0.addEventListener('squeezestart', onSqueezeStart0);
 controller0.addEventListener('squeezeend', onSqueezeEnd0);
 
-// Bounding box for calculations
-const sphereBoundingBox = new THREE.Box3();
-const meshBoundingBox = new THREE.Box3();
-
-/**
- * Checks if the selectionSphere is intersecting with any grabbable mesh.
- * @param sphere The controller's selection sphere.
- * @param meshes A list of meshes to test against.
- * @returns The first intersecting mesh, or null.
- */
-function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THREE.Mesh | null {
-    // IMPORTANT: Update the world matrix of the sphere
-    sphere.updateWorldMatrix(true, false);
-    // Get the sphere's world-space bounding box
-    sphereBoundingBox.setFromObject(sphere);
-
-    for (const mesh of meshes) {
-        // IMPORTANT: Update the world matrix of the mesh
-        mesh.updateWorldMatrix(true, false);
-        // Get the mesh's world-space bounding box
-        meshBoundingBox.setFromObject(mesh);
-
-        // Check for intersection
-        if (sphereBoundingBox.intersectsBox(meshBoundingBox)) {
-            return mesh;
-        }
-    }
-    return null;
-}
-
+// Bounding box constants and highlightMaterial are now in utils.ts
 
 /**
  * Fired on 'select' (trigger) press.
- * Selects an object if the sphere is intersecting.
+ * Selects an object if the sphere is intersecting, implementing iterative selection.
  */
 function onSelectStart0(event: THREE.Event) {
-    // Check for intersections
+    // Check for intersections using the imported helper
     const intersectingMesh = checkIntersection(selectionSphere0, grabbableMeshes);
     
+    // Clear previous highlight using the imported helper
+    setHighlight(selectedObject, false);
+
     if (intersectingMesh) {
-        // Object is found! Store it as 'selectedObject'
-        selectedObject = intersectingMesh;
+        let nextObject: THREE.Object3D;
         
+        // --- Logic to reset selection if pointing at a new object/model ---
+        let pointingAtNewObject = true;
+        
+        // Check if the currently selected object is an ancestor of the new intersecting mesh
+        if (selectedObject) {
+            let currentAncestor: THREE.Object3D | null = intersectingMesh;
+            while(currentAncestor) {
+                if (currentAncestor === selectedObject) {
+                    pointingAtNewObject = false;
+                    break;
+                }
+                currentAncestor = currentAncestor.parent;
+                // Stop traversing when we hit the scene
+                if (currentAncestor === scene) break; 
+            }
+        }
+
+        // If we are pointing at a completely new object (not a child of the current selection), reset
+        if (selectedObject && pointingAtNewObject) {
+             selectedObject = null;
+        }
+
+        // Object is found! Determine the next object in the selection cycle using the imported helper.
+        // NOTE: selectedObject and scene are passed to the helper function.
+        nextObject = iterativeSelectParent(intersectingMesh, selectedObject, scene);
+        
+        // Update selection state
+        selectedObject = nextObject;
+        
+        // Apply highlight to the newly selected object using the imported helper
+        setHighlight(selectedObject, true);
+
         // Visual feedback: Make the selection sphere green
         (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00); 
-        console.log("Object selected:", selectedObject.name);
+        // Use instanceof check here for accurate logging
+        console.log("Object selected:", selectedObject.name || "Unnamed Object", "Type:", selectedObject instanceof THREE.Mesh ? "Mesh" : "Group/Parent");
     } else {
-        // No object found, clear selection
+        // No object found, clear selection and reset sphere color
         selectedObject = null;
+        (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff); // Reset to default color
         console.log("No object selected.");
     }
 }
@@ -115,11 +127,8 @@ function onSelectStart0(event: THREE.Event) {
  * Resets the selection sphere color.
  */
 function onSelectEnd0(event: THREE.Event) {
-    // Reset sphere color to red
-    (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xff0000);
-    
-    // Note: 'selectedObject' is kept, as per your logic, 
-    // until 'grab' is pressed.
+    // Reset sphere color to white (default)
+    (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
 }
 
 /**
@@ -130,6 +139,10 @@ function onSqueezeStart0(event: THREE.Event) {
     // Check if we have an object selected AND we aren't already holding something
     if (selectedObject && !grabbedObject) {
         console.log("Grabbing object:", selectedObject.name);
+        
+        // Clear highlight before grabbing
+        setHighlight(selectedObject, false);
+        
         // Set the 'grabbedObject'
         grabbedObject = selectedObject;
 
@@ -177,16 +190,16 @@ loader.load(
 );
 
 const modelPath = './models/v12.glb'; 
+
 loader.load(
 	modelPath,
 	function ( gltf ) {
 		scene.add( gltf.scene );
-        console.log(gltf.scene);
-        console.log(scene.getObjectByName('v12_engine_assembly_1001'));
-        gltf.scene.traverse((child) => { 
+
+        gltf.scene.traverse((child) => {
             // We only want to interact with Meshes
-            if ((child as THREE.Mesh).isMesh) {
-                const mesh = child as THREE.Mesh;
+            if (child instanceof THREE.Mesh) {
+                const mesh = child;
                 grabbableMeshes.push(mesh);
                 console.log('Found grabbable mesh:', mesh.name);
             }
