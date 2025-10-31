@@ -2,7 +2,6 @@
 
 import * as THREE from 'three'; 
 import { createControllers } from './controller.ts';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { 
     checkIntersection, 
     setHighlight, 
@@ -171,29 +170,19 @@ function onSqueezeEnd0(event: THREE.Event) {
     }
 }
 
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-// --- GLTF MODEL LOADING ---
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/' ); 
 const loader = new GLTFLoader();
-
-const environmentPath = './models/environment.glb';
-loader.load(
-	environmentPath,
-	function ( gltf ) {
-		scene.add( gltf.scene );
-	},
-	function ( xhr ) {
-		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-	},
-	function ( error ) {
-		console.log( 'An error happened', error );
-	}
-);
+loader.setDRACOLoader( dracoLoader );
 
 const modelPath = './models/v12.glb'; 
-
-loader.load(
-	modelPath,
-	function ( gltf ) {
+loader.load( 
+    modelPath, 
+    // Success callback
+    function ( gltf ) {
 		scene.add( gltf.scene );
 
         gltf.scene.traverse((child) => {
@@ -204,6 +193,22 @@ loader.load(
                 console.log('Found grabbable mesh:', mesh.name);
             }
         });
+    },
+    // Progress callback
+    function ( xhr ) {
+		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+	},
+    // Error callback
+    function ( error ) {
+        console.error( 'Loading error:', error );
+    }
+);
+
+const environmentPath = './models/environment.glb';
+loader.load(
+	environmentPath,
+	function ( gltf ) {
+		scene.add( gltf.scene );
 	},
 	function ( xhr ) {
 		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
