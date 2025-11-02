@@ -1,14 +1,18 @@
 // main.ts (Refactored)
 
 import * as THREE from 'three'; 
+
+import { initUI, UIManager } from './utils/ui.ts';
+
 import { createControllers } from './controller.ts';
 import { 
-    checkIntersection, 
-    setHighlight, 
+    checkIntersection,
     iterativeSelectParent,
-    storeOriginalState, // Aggiunto
-    checkAndReattach    // Aggiunto
-} from './utils.ts';
+    storeOriginalState,
+    checkAndReattach
+ } from './utils/interaction.ts';
+
+import { setHighlight } from './utils/visual.ts';
 
 // 1. Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -182,14 +186,15 @@ function onSqueezeEnd0(event: THREE.Event) {
         //controllerGrip0.remove(grabbedObject); // Prima lo si scollega dal controllerGrip
         //scene.add(grabbedObject);               // Poi lo si attacca alla scena
 
-        const reattached = checkAndReattach(grabbedObject, scene, 0.01); // 0.01m = 1cm tolerance
+        const reattached = checkAndReattach(grabbedObject, scene, 0.05);
+
         if(reattached){
             setHighlight(grabbedObject,false);
+            selectedObject = null;
         }
 
         // Clear the grabbed and selected states
         grabbedObject = null;
-        //selectedObject = null;
     }
 }
 
@@ -214,7 +219,7 @@ loader.load(
                 const mesh = child;
                 grabbableMeshes.push(mesh);
                 storeOriginalState(mesh);
-                console.log('Found grabbable mesh:', mesh.name);
+                //console.log('Found grabbable mesh:', mesh.name);
             }
         });
     },
@@ -241,6 +246,17 @@ loader.load(
 		console.log( 'An error happened', error );
 	}
 );
+
+const uiManager: UIManager = initUI(scene, renderer, camera, controllerRefs);
+
+uiManager.create(
+    './menus/menu.html',
+    new THREE.Vector3(0, 1.5, -1), // Position: center, 1.5m high, 1m in front
+    new THREE.Euler(0, 0, 0),      // Rotation: no rotation
+    1,                         // Scale: 0.005
+    'Main VR Menu'                 // Name
+);
+
 
 /*
  Called by index.html when the 'Start VR' button is clicked.

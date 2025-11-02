@@ -4,13 +4,6 @@ import * as THREE from 'three';
 const meshBoundingBox = new THREE.Box3();
 const worldSelectionSphere = new THREE.Sphere();
 
-// A distinct material for highlighting selected objects
-export const highlightMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0x00ffff, // Cyan highlight
-    transparent: true,
-    opacity: 0.7 
-});
-
 // Global Raycaster Instance
 const raycaster = new THREE.Raycaster();
 // Array of initial ray directions (X+, X-, Y+, Y-, Z+, Z-)
@@ -20,6 +13,7 @@ const rayDirections = [
     new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
     new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
 ];
+
 /**
  * Checks for intersection by casting 6 rays from the sphere center and validating the hit
  * against the mesh's Bounding Box (AABB).
@@ -87,54 +81,6 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
     return closestMesh;
 }
 
-/*function getSphereRadius(sphere: THREE.Mesh): number {
-    const boundingSphere = new THREE.Sphere();
-    // Calculate the bounding sphere in local space
-    if (sphere.geometry.boundingSphere === null) {
-        sphere.geometry.computeBoundingSphere();
-    }
-    boundingSphere.copy(sphere.geometry.boundingSphere!);
-    // Apply the mesh's scale to the radius
-    return boundingSphere.radius * sphere.scale.x; // Assumes uniform scaling
-}*/
-
-/**
- * Applies or restores the visual highlight of an object (mesh or parent group) by using
- * the highlightMaterial and storing the original material in the mesh's userData.
- * @param object The Object3D to highlight or unhighlight.
- * @param enable True to apply highlight, false to restore original material.
- */
-export function setHighlight(object: THREE.Object3D | null, enable: boolean) {
-    if (!object) return;
-
-    // 1. Apply Highlight
-    if (enable) {
-        object.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                const mesh = child;
-                // Store the original material on the mesh itself if not already stored
-                if (!mesh.userData.highlightOriginalMaterial) {
-                    mesh.userData.highlightOriginalMaterial = mesh.material;
-                }
-                // Apply the highlight material
-                mesh.material = highlightMaterial;
-            }
-        });
-    }
-    
-    // 2. Restore/Remove Highlight
-    else { // if (!enable)
-        object.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.userData.highlightOriginalMaterial) {
-                const mesh = child;
-                // Restore the original material from userData
-                mesh.material = mesh.userData.highlightOriginalMaterial;
-                delete mesh.userData.highlightOriginalMaterial; // Clean up
-            }
-        });
-    }
-}
-
 /**
  * Implements the iterative parent selection logic, cycling from Root -> Child -> Mesh.
  * @param intersectedMesh The mesh hit by the controller sphere.
@@ -198,7 +144,6 @@ export function iterativeSelectParent(
     }
 }
 
-const REATTACH_TOLERANCE_SQ = 0.01; // 1 cm squared for fast comparison
 /**
  * Salva il parent originale, la posizione locale e **la rotazione locale** di un oggetto.
  * Questa funzione dovrebbe essere chiamata una sola volta al momento del caricamento del modello.
