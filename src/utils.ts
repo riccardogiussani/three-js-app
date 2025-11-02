@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 // Bounding boxes used for intersection calculations
 const meshBoundingBox = new THREE.Box3();
+const worldSelectionSphere = new THREE.Sphere();
 
 // A distinct material for highlighting selected objects
 export const highlightMaterial = new THREE.MeshBasicMaterial({ 
@@ -33,7 +34,8 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
     sphere.getWorldPosition(sphereOrigin);
 
     // Get the radius of the sphere (FIXED: accessing sphere.radius is invalid)
-    const sphereRadius = getSphereRadius(sphere);
+    const sphereRadius = sphere.userData.radius; //getSphereRadius(sphere);
+    worldSelectionSphere.set(sphereOrigin, sphereRadius);
 
     let closestHit: THREE.Intersection | null = null;
     let closestMesh: THREE.Mesh | null = null;
@@ -48,7 +50,7 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
         // Does the sphere's center fall within the mesh's bounding box?
         meshBoundingBox.setFromObject(mesh);
         
-        if (meshBoundingBox.containsPoint(sphereOrigin)) {
+        if (meshBoundingBox.intersectsSphere(worldSelectionSphere)) {
             // This mesh is a candidate. Now, cast rays to find the closest point of entry/exit.
             
             // 3. Raycast in 6 directions from the sphere center
@@ -85,7 +87,7 @@ export function checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]): THR
     return closestMesh;
 }
 
-function getSphereRadius(sphere: THREE.Mesh): number {
+/*function getSphereRadius(sphere: THREE.Mesh): number {
     const boundingSphere = new THREE.Sphere();
     // Calculate the bounding sphere in local space
     if (sphere.geometry.boundingSphere === null) {
@@ -94,7 +96,7 @@ function getSphereRadius(sphere: THREE.Mesh): number {
     boundingSphere.copy(sphere.geometry.boundingSphere!);
     // Apply the mesh's scale to the radius
     return boundingSphere.radius * sphere.scale.x; // Assumes uniform scaling
-}
+}*/
 
 /**
  * Applies or restores the visual highlight of an object (mesh or parent group) by using
@@ -194,4 +196,84 @@ export function iterativeSelectParent(
         // We reached the end (the intersected mesh) in the last step, so cycle back to the root
         return findModelRoot(intersectedMesh);
     }
+}
+
+const REATTACH_TOLERANCE_SQ = 0.01; // 1 cm squared for fast comparison
+/**
+ * Salva il parent originale, la posizione locale e **la rotazione locale** di un oggetto.
+ * Questa funzione dovrebbe essere chiamata una sola volta al momento del caricamento del modello.
+ * @param object L'oggetto da cui salvare lo stato (Mesh o Gruppo).
+ */
+export function storeOriginalState(object: THREE.Object3D) {
+    if (object.parent) {
+        // Salva il parent (che sarà la scena o un gruppo)
+        object.userData.originalParent = object.parent;
+        // Salva la posizione locale attuale
+        object.userData.originalLocalPosition = object.position.clone();
+        // === NUOVO: Salva la rotazione locale attuale (Quaternion) ===
+        object.userData.originalLocalRotation = object.quaternion.clone();
+    } else {
+        // Se non ha un parent (es. è la scena stessa o la radice assoluta), non salvare
+        console.warn("L'oggetto non ha un parent, impossibile salvare lo stato originale.");
+    }
+}
+
+/**
+ * Controlla se l'oggetto è stato posizionato entro la tolleranza e lo ri-attacca
+ * al suo parent originale nella sua posizione locale e **rotazione locale** originale.
+ * @param object L'oggetto rilasciato (normalmente il 'grabbedObject').
+ * @param scene La THREE.Scene, necessaria perché l'oggetto viene ri-attaccato a essa se non soddisfa la condizione.
+ * @param tolerance Il raggio di tolleranza per il ri-attacco (es. 0.01 per 1cm).
+ * @returns True se l'oggetto è stato ri-attaccato, False altrimenti.
+ */
+export function checkAndReattach(object: THREE.Object3D, scene: THREE.Scene, tolerance: number = 0.01): boolean {
+    const originalParent = object.userData.originalParent as THREE.Object3D | undefined;
+    const originalLocalPosition = object.userData.originalLocalPosition as THREE.Vector3 | undefined;
+    const originalLocalRotation = object.userData.originalLocalRotation as THREE.Quaternion | undefined;
+
+    // Se non abbiamo i dati originali, non possiamo ri-attaccare.
+    if (!originalParent || !originalLocalPosition || !originalLocalRotation) {
+        return false;
+    }
+    
+    // 1. Calcola la posizione 'Target' (posizione mondiale che l'oggetto dovrebbe avere)
+    const targetParentMatrix = originalParent.matrixWorld.clone();
+    const targetWorldPosition = originalLocalPosition.clone().applyMatrix4(targetParentMatrix);
+
+    // 2. Calcola la posizione 'Current' (posizione mondiale attuale dell'oggetto)
+    object.updateWorldMatrix(true, false);
+    const currentWorldPosition = new THREE.Vector3();
+    object.getWorldPosition(currentWorldPosition);
+
+    // 3. Verifica la distanza tra le due posizioni mondiali
+    // === CORREZIONE PER L'ERRORE DI TIPO ===
+    // Calcola la distanza al quadrato manualmente per evitare la chiamata a 'distanceToSq'
+    const dx = currentWorldPosition.x - targetWorldPosition.x;
+    const dy = currentWorldPosition.y - targetWorldPosition.y;
+    const dz = currentWorldPosition.z - targetWorldPosition.z;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
+
+    const toleranceSq = tolerance * tolerance;
+
+    if (distanceSq <= toleranceSq) {
+        // La condizione è soddisfatta: ri-attacca l'oggetto!
+        
+        // Prima, rimuoviamo l'oggetto dalla SCENA (dove è stato rilasciato)
+        scene.remove(object); 
+        
+        // Ora, ri-attacchiamolo al parent originale
+        originalParent.add(object);
+        
+        // Imposta la posizione locale alla posizione originale salvata
+        object.position.copy(originalLocalPosition);
+        
+        // Ripristina la rotazione locale salvata
+        object.quaternion.copy(originalLocalRotation);
+        
+        console.log(`Ri-attaccato ${object.name} al parent originale: ${originalParent.name}. Distanza²: ${distanceSq.toFixed(5)}`);
+        return true;
+    }
+    
+    // Non ri-attaccato: rimarrà attaccato alla SCENA
+    return false;
 }

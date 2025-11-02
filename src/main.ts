@@ -5,7 +5,9 @@ import { createControllers } from './controller.ts';
 import { 
     checkIntersection, 
     setHighlight, 
-    iterativeSelectParent
+    iterativeSelectParent,
+    storeOriginalState, // Aggiunto
+    checkAndReattach    // Aggiunto
 } from './utils.ts';
 
 // 1. Setup the Scene, Camera, and Renderer
@@ -137,17 +139,31 @@ function onSelectEnd0(event: THREE.Event) {
 function onSqueezeStart0(event: THREE.Event) {
     // Check if we have an object selected AND we aren't already holding something
     if (selectedObject && !grabbedObject) {
-        console.log("Grabbing object:", selectedObject.name);
-        
-        // Clear highlight before grabbing
-        setHighlight(selectedObject, false);
-        
-        // Set the 'grabbedObject'
-        grabbedObject = selectedObject;
+        // Gather all mesh descendants of the selected object for intersection check
+        let meshesToCheck: THREE.Mesh[] = [];
+        selectedObject.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                meshesToCheck.push(child);
+            }
+        });
+        // Perform the intersection check on only the meshes belonging to the selected object
+        const intersectingMesh = checkIntersection(selectionSphere0, meshesToCheck);
 
-        // Attach the object to the CONTROLLER GRIP
-        // This makes the object move with the controller
-        controllerGrip0.attach(grabbedObject);
+        if (intersectingMesh) {
+            console.log("Grabbing object:", selectedObject.name);
+            
+            // Clear highlight before grabbing
+            //setHighlight(selectedObject, false);
+            
+            // Set the 'grabbedObject'
+            grabbedObject = selectedObject;
+
+            // Attach the object to the CONTROLLER GRIP
+            // This makes the object move with the controller
+            controllerGrip0.attach(grabbedObject);
+        } else {
+            console.log("Squeeze attempted, but selection sphere is not intersecting the selected object.");
+        }
     }
 }
 
@@ -163,10 +179,17 @@ function onSqueezeEnd0(event: THREE.Event) {
         // Attach the object back to the main SCENE
         // This makes it independent of the controller again
         scene.attach(grabbedObject);
+        //controllerGrip0.remove(grabbedObject); // Prima lo si scollega dal controllerGrip
+        //scene.add(grabbedObject);               // Poi lo si attacca alla scena
+
+        const reattached = checkAndReattach(grabbedObject, scene, 0.01); // 0.01m = 1cm tolerance
+        if(reattached){
+            setHighlight(grabbedObject,false);
+        }
 
         // Clear the grabbed and selected states
         grabbedObject = null;
-        selectedObject = null;
+        //selectedObject = null;
     }
 }
 
@@ -190,6 +213,7 @@ loader.load(
             if (child instanceof THREE.Mesh) {
                 const mesh = child;
                 grabbableMeshes.push(mesh);
+                storeOriginalState(mesh);
                 console.log('Found grabbable mesh:', mesh.name);
             }
         });

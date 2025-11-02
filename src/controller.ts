@@ -45,10 +45,12 @@ function setupController(index: number, renderer: WebGLRenderer, scene: THREE.Sc
     controller.add(rayLine);
 
     // A small sphere used for intersection checks
-    const sphereGeometry = new THREE.SphereGeometry(0.01, 8, 8);
+    const sphereRadius = 0.01;
+    const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 8, 8);
     // Red, wireframe material for visibility
     const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff /*, wireframe: true*/ }); 
     const selectionSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    selectionSphere.userData.radius = sphereRadius;
     
     // Position it slightly forward from the grip origin
     selectionSphere.position.set(0, 0, -0.03); 
