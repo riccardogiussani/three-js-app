@@ -69,10 +69,7 @@ controller0.addEventListener('squeezeend', onSqueezeEnd0);
 
 // Bounding box constants and highlightMaterial are now in utils.ts
 
-/**
- * Fired on 'select' (trigger) press.
- * Selects an object if the sphere is intersecting, implementing iterative selection.
- */
+
 function onSelectStart0(event: THREE.Event) {
     // Check for intersections using the imported helper
     const intersectingMesh = checkIntersection(selectionSphere0, grabbableMeshes);
@@ -126,20 +123,10 @@ function onSelectStart0(event: THREE.Event) {
         console.log("No object selected.");
     }
 }
-
-/**
- * Fired on 'select' (trigger) release.
- * Resets the selection sphere color.
- */
 function onSelectEnd0(event: THREE.Event) {
     // Reset sphere color to white (default)
     (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
 }
-
-/**
- * Fired on 'squeeze' (grip) press.
- * Grabs the 'selectedObject' if one exists.
- */
 function onSqueezeStart0(event: THREE.Event) {
     // Check if we have an object selected AND we aren't already holding something
     if (selectedObject && !grabbedObject) {
@@ -170,11 +157,6 @@ function onSqueezeStart0(event: THREE.Event) {
         }
     }
 }
-
-/**
- * Fired on 'squeeze' (grip) release.
- * Releases the 'grabbedObject'.
- */
 function onSqueezeEnd0(event: THREE.Event) {
     // Check if we are currently holding an object
     if (grabbedObject) {

@@ -1,0 +1,53 @@
+<div id="vr-options-menu" style="
+    /* Crucial: Ensure the root element has defined width and height */
+    width: 250px; /* Slightly smaller width */
+    height: 250px;
+    
+    background: rgba(40, 44, 52, 0.9); 
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    color: #FFF; 
+    font-family: Arial, sans-serif;
+    text-align: left; /* Changed to left for alignment of inputs */
+    border: 2px solid #61AFEF;
+">
+    <h1 style="font-size: 20px; margin-bottom: 15px; color: #98C379; text-align: center;">View Options</h1>
+
+    <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 15px; font-size: 16px; color: #ABB2BF;">
+            <input type="checkbox" id="hide-ui" name="hide-ui" checked 
+                onchange="console.log('Hide UI toggled: ' + this.checked)"
+                style="margin-right: 10px; accent-color: #56B6C2;"> 
+            **Hide Environment**
+        </label>
+        
+        <label style="display: block; margin-bottom: 15px; font-size: 16px; color: #ABB2BF;">
+            <input type="checkbox" id="snap-grid" name="snap-grid"
+                onchange="console.log('Snap to Grid toggled: ' + this.checked)"
+                style="margin-right: 10px; accent-color: #E06C75;">
+            **Snap to Grid**
+        </label>
+
+        <label style="display: block; margin-bottom: 15px; font-size: 16px; color: #ABB2BF;">
+            <input type="checkbox" id="show-labels" name="show-labels"
+                onchange="console.log('Show Labels toggled: ' + this.checked)"
+                style="margin-right: 10px; accent-color: #61AFEF;">
+            Show Object Labels
+        </label>
+    </div>
+
+    <button onclick="console.log('Options Confirmed!')" style="
+        background-color: #98C379; 
+        color: white; 
+        border: none; 
+        padding: 10px 20px; 
+        margin-top: 10px;
+        border-radius: 8px; 
+        cursor: pointer;
+        width: 100%;
+        transition: background-color 0.2s;
+    ">
+        Apply
+    </button>
+</div>

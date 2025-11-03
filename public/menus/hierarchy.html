@@ -1,0 +1,47 @@
+<div id="vr-tree-menu" style="
+    /* Crucial: Ensure the root element has defined width and height */
+    width: 300px;
+    height: 350px; /* Increased height to accommodate the list */
+    
+    background: rgba(40, 44, 52, 0.9); 
+    padding: 20px; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    color: #FFF; 
+    font-family: Arial, sans-serif;
+    text-align: left; /* Changed to left for list readability */
+    border: 2px solid #61AFEF;
+">
+    <h1 style="font-size: 24px; margin-bottom: 15px; color: #98C379; text-align: center;">Object Hierarchy</h1>
+    <p style="font-size: 14px; margin-bottom: 10px; color: #ABB2BF; text-align: center;">
+        Click an item to select it.
+    </p>
+
+    <ul style="
+        list-style-type: none; 
+        padding-left: 10px; 
+        margin: 0;
+        overflow-y: auto; /* Allows scrolling if the list gets too long */
+        max-height: 250px;
+    ">
+        <li style="margin-top: 8px;">
+            <span onclick="console.log('Root Object clicked!')" style="cursor: pointer; color: #56B6C2;">▶ Scene Root</span>
+            <ul style="list-style-type: none; padding-left: 15px; margin-top: 5px;">
+                <li>
+                    <span onclick="console.log('Camera clicked!')" style="cursor: pointer; color: #E06C75;">&#x25CF; Main Camera</span>
+                </li>
+                <li>
+                    <span onclick="console.log('Group clicked!')" style="cursor: pointer; color: #98C379;">▼ Object Group A</span>
+                    <ul style="list-style-type: none; padding-left: 15px; margin-top: 5px;">
+                        <li>
+                            <span onclick="console.log('Cube clicked!')" style="cursor: pointer; color: #ABB2BF;">&#x25CF; Cube 1</span>
+                        </li>
+                        <li>
+                            <span onclick="console.log('Sphere clicked!')" style="cursor: pointer; color: #ABB2BF;">&#x25CF; Sphere 2</span>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+    </ul>
+    </div>
