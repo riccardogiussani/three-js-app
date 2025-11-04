@@ -3,17 +3,10 @@
 import * as THREE from 'three'; 
 
 import { initUI, UIManager } from './utils/ui.ts';
+import { initInteraction, InteractionManager } from './utils/interaction.ts';
 import { initEventManager, EventManager } from './utils/events.ts';
 
 import { createControllers } from './controller.ts';
-import { 
-    checkIntersection,
-    iterativeSelectParent,
-    storeOriginalState,
-    checkAndReattach
- } from './utils/interaction.ts';
-
-import { setHighlight } from './utils/visual.ts';
 
 // 1. Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -32,24 +25,6 @@ scene.add(directionalLight);
 
 camera.position.z = 5;
 
-/**
- * A list of all meshes in the scene that can be interacted with.
- * This will be populated by the GLTFLoader.
- */
-const grabbableMeshes: THREE.Mesh[] = [];
-
-/**
- * The object currently "selected" by the 'select' (trigger) button.
- * It is not yet grabbed.
- */
-let selectedObject: THREE.Object3D | null = null; // Changed type to Object3D to handle parent groups
-
-/**
- * The object currently "grabbed" by the 'squeeze' (grip) button.
- * This object is attached to the controller.
- */
-let grabbedObject: THREE.Object3D | null = null; // Changed type to Object3D
-
 
 // Get all controller references, including the new grips and spheres
 const controllerRefs = createControllers(renderer, scene);
@@ -62,6 +37,8 @@ const {
     // controller1, rayLine1, controllerGrip1, selectionSphere1
 } = controllerRefs;
 
+const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerGrip0);
+
 // --- Register Event Listeners for Controller 0 ---
 controller0.addEventListener('selectstart', onSelectStart0);
 controller0.addEventListener('selectend', onSelectEnd0);
@@ -70,115 +47,20 @@ controller0.addEventListener('squeezeend', onSqueezeEnd0);
 
 // Bounding box constants and highlightMaterial are now in utils.ts
 
-
 function onSelectStart0(event: THREE.Event) {
-    // Check for intersections using the imported helper
-    const intersectingMesh = checkIntersection(selectionSphere0, grabbableMeshes);
-    
-    // Clear previous highlight using the imported helper
-    setHighlight(selectedObject, false);
-
-    if (intersectingMesh) {
-        let nextObject: THREE.Object3D;
-        
-        // --- Logic to reset selection if pointing at a new object/model ---
-        let pointingAtNewObject = true;
-        
-        // Check if the currently selected object is an ancestor of the new intersecting mesh
-        if (selectedObject) {
-            let currentAncestor: THREE.Object3D | null = intersectingMesh;
-            while(currentAncestor) {
-                if (currentAncestor === selectedObject) {
-                    pointingAtNewObject = false;
-                    break;
-                }
-                currentAncestor = currentAncestor.parent;
-                // Stop traversing when we hit the scene
-                if (currentAncestor === scene) break; 
-            }
-        }
-
-        // If we are pointing at a completely new object (not a child of the current selection), reset
-        if (selectedObject && pointingAtNewObject) {
-             selectedObject = null;
-        }
-
-        // Object is found! Determine the next object in the selection cycle using the imported helper.
-        // NOTE: selectedObject and scene are passed to the helper function.
-        nextObject = iterativeSelectParent(intersectingMesh, selectedObject, scene);
-        
-        // Update selection state
-        selectedObject = nextObject;
-        
-        // Apply highlight to the newly selected object using the imported helper
-        setHighlight(selectedObject, true);
-
-        // Visual feedback: Make the selection sphere green
-        (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00); 
-        // Use instanceof check here for accurate logging
-        console.log("Object selected:", selectedObject.name || "Unnamed Object", "Type:", selectedObject instanceof THREE.Mesh ? "Mesh" : "Group/Parent");
-    } else {
-        // No object found, clear selection and reset sphere color
-        selectedObject = null;
-        (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff); // Reset to default color
-        console.log("No object selected.");
-    }
+    // Visual feedback: Make the selection sphere green
+    (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00); 
+    interactionManager.trySelect(selectionSphere0);    
 }
 function onSelectEnd0(event: THREE.Event) {
     // Reset sphere color to white (default)
     (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
 }
 function onSqueezeStart0(event: THREE.Event) {
-    // Check if we have an object selected AND we aren't already holding something
-    if (selectedObject && !grabbedObject) {
-        // Gather all mesh descendants of the selected object for intersection check
-        let meshesToCheck: THREE.Mesh[] = [];
-        selectedObject.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-                meshesToCheck.push(child);
-            }
-        });
-        // Perform the intersection check on only the meshes belonging to the selected object
-        const intersectingMesh = checkIntersection(selectionSphere0, meshesToCheck);
-
-        if (intersectingMesh) {
-            console.log("Grabbing object:", selectedObject.name);
-            
-            // Clear highlight before grabbing
-            //setHighlight(selectedObject, false);
-            
-            // Set the 'grabbedObject'
-            grabbedObject = selectedObject;
-
-            // Attach the object to the CONTROLLER GRIP
-            // This makes the object move with the controller
-            controllerGrip0.attach(grabbedObject);
-        } else {
-            console.log("Squeeze attempted, but selection sphere is not intersecting the selected object.");
-        }
-    }
+    interactionManager.tryGrab(selectionSphere0);
 }
 function onSqueezeEnd0(event: THREE.Event) {
-    // Check if we are currently holding an object
-    if (grabbedObject) {
-        console.log("Releasing object:", grabbedObject.name);
-        
-        // Attach the object back to the main SCENE
-        // This makes it independent of the controller again
-        scene.attach(grabbedObject);
-        //controllerGrip0.remove(grabbedObject); // Prima lo si scollega dal controllerGrip
-        //scene.add(grabbedObject);               // Poi lo si attacca alla scena
-
-        const reattached = checkAndReattach(grabbedObject, scene, 0.05);
-
-        if(reattached){
-            setHighlight(grabbedObject,false);
-            selectedObject = null;
-        }
-
-        // Clear the grabbed and selected states
-        grabbedObject = null;
-    }
+    interactionManager.release();
 }
 
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -200,8 +82,7 @@ loader.load(
             // We only want to interact with Meshes
             if (child instanceof THREE.Mesh) {
                 const mesh = child;
-                grabbableMeshes.push(mesh);
-                storeOriginalState(mesh);
+                interactionManager.setGrabbable(mesh);
                 //console.log('Found grabbable mesh:', mesh.name);
             }
         });
