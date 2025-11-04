@@ -101,3 +101,7 @@ export function initUI(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera
     // Assuming controllerRefs.controller0 is the primary controller (THREE.Group)
     return new UIManager(scene, renderer, camera, controllerRefs.controller0);
 }
+
+export function menuCallback(payload: any){
+    console.log(`Action called from menu! ${payload.value}`);
+}

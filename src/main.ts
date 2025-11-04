@@ -3,6 +3,7 @@
 import * as THREE from 'three'; 
 
 import { initUI, UIManager } from './utils/ui.ts';
+import { initEventManager, EventManager } from './utils/events.ts';
 
 import { createControllers } from './controller.ts';
 import { 
@@ -230,15 +231,17 @@ loader.load(
 );
 
 const uiManager: UIManager = initUI(scene, renderer, camera, controllerRefs);
-
 uiManager.create(
     './menus/menu.html',
     new THREE.Vector3(0, 1.5, -1), // Position: center, 1.5m high, 1m in front
     new THREE.Euler(0, 0, 0),      // Rotation: no rotation
-    1,                         // Scale: 0.005
+    1,                             // Scale: 0.005
     'Main VR Menu'                 // Name
 );
 
+import { menuCallback } from './utils/ui.ts';
+let eventManager: EventManager = initEventManager('*');
+eventManager.registerAction('menu', menuCallback);
 
 /*
  Called by index.html when the 'Start VR' button is clicked.

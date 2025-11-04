@@ -28,7 +28,7 @@
     ">
         Action 1
     </button>
-    <button onclick="console.log('Action 2 clicked!')" style="
+    <button onclick="window.parent.postMessage({ action: 'menu', payload: { value: false } }, '*')" style="
         background-color: #E06C75; 
         color: white; 
         border: none; 

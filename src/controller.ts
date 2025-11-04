@@ -1,4 +1,4 @@
-// controller.ts (Modified)
+// controller.ts
 
 import * as THREE from 'three';
 import { WebGLRenderer } from 'three';
