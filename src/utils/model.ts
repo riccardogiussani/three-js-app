@@ -10,10 +10,7 @@ export class LoaderManager {
     private dracoLoader = new DRACOLoader();
     private loader = new GLTFLoader();
 
-    /**
-     * @param scene The main Three.js scene.
-     */
-constructor(scene: THREE.Scene, interactionManager:InteractionManager) {
+    constructor(scene: THREE.Scene, interactionManager:InteractionManager) {
         this.scene = scene;
         this.interactionManager = interactionManager;
         this.dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/' ); 
@@ -32,12 +29,13 @@ constructor(scene: THREE.Scene, interactionManager:InteractionManager) {
                 gltf.scene.traverse((child) => {
                     if (child instanceof THREE.Mesh) {
                         // Compute BVH once — persistent spatial structure
-                        child.geometry.computeBoundsTree();
+                        //child.geometry.computeBoundsTree();
+                        const mesh = child;
 
                         if (isGrabbable) {
                             interactionManager.setGrabbable(child);
-                        }
                     }
+                }
                 });
             },
             // Progress callback

@@ -2,17 +2,19 @@
 
 import * as THREE from 'three';
 
+/*
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
+*/
 
 import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';
 import { initEventManager, EventManager } from './utils/events.ts';
 import { initLoaderManager, LoaderManager } from './utils/model.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
-import { ButtonEvent } from './utils/controller.ts';
+//import { ButtonEvent } from './utils/controller.ts';
 
 // Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
