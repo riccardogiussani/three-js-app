@@ -19,6 +19,13 @@ document.body.appendChild(renderer.domElement);
 
 camera.position.z = 5;
 
+
+import Stats from 'stats-gl';
+const stats = new Stats({ horizontal: false, trackGPU: true });
+stats.init(renderer);
+document.body.appendChild(stats.dom);
+
+
 // Add Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -27,7 +34,7 @@ directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
 // Setup scene Managers
-const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for production
+const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
 const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
@@ -142,5 +149,7 @@ window.addEventListener('resize', onWindowResize);
 function animate(time?: number) {
     renderer.render(scene, camera);
     controllerManager.update();
+
+    stats.update();
 }
 renderer.setAnimationLoop(animate);
