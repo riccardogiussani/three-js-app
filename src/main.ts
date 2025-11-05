@@ -1,6 +1,11 @@
 // main.ts
 
-import * as THREE from 'three'; 
+import * as THREE from 'three';
+
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';

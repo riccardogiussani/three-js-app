@@ -26,17 +26,19 @@ constructor(scene: THREE.Scene, interactionManager:InteractionManager) {
         this.loader.load( 
             modelPath, 
             // Success callback
-            function ( gltf ) {
-                scene.add( gltf.scene );
+            function (gltf) {
+                scene.add(gltf.scene);
 
-                if(isGrabbable){
-                    gltf.scene.traverse((child) => {
+                gltf.scene.traverse((child) => {
                     if (child instanceof THREE.Mesh) {
-                        const mesh = child;
-                        interactionManager.setGrabbable(mesh);
+                        // Compute BVH once — persistent spatial structure
+                        child.geometry.computeBoundsTree();
+
+                        if (isGrabbable) {
+                            interactionManager.setGrabbable(child);
+                        }
                     }
                 });
-                }
             },
             // Progress callback
             function ( xhr ) {

@@ -181,65 +181,47 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
      * @param meshes A list of meshes to test against.
      * @returns The closest intersecting mesh that also passes the AABB check, or null.
      */
-    checkIntersection(sphere: THREE.Mesh, meshes: THREE.Mesh[]=this.grabbableMeshes): THREE.Mesh | null {
-        // Get the world position of the sphere center (our ray origin)
+    checkIntersection(
+        sphere: THREE.Mesh,
+        meshes: THREE.Mesh[] = this.grabbableMeshes
+    ): THREE.Mesh | null {
+        // Update world matrix of the selection sphere
         sphere.updateWorldMatrix(true, false);
         const sphereOrigin = new THREE.Vector3();
         sphere.getWorldPosition(sphereOrigin);
 
-        // Get the radius of the sphere (FIXED: accessing sphere.radius is invalid)
-        const sphereRadius = sphere.userData.radius; //getSphereRadius(sphere);
+        const sphereRadius = sphere.userData.radius;
         worldSelectionSphere.set(sphereOrigin, sphereRadius);
 
-        let closestHit: THREE.Intersection | null = null;
         let closestMesh: THREE.Mesh | null = null;
         let minDistance = Infinity;
-        
-        // We want to return the mesh that is both AABB intersecting AND has the closest ray hit.
-        
-        // Iterate through all grabbable meshes to find candidates
+
+        // Broad phase: filter meshes by AABB intersection
         for (const mesh of meshes) {
             mesh.updateWorldMatrix(true, false);
-            
-            // Does the sphere's center fall within the mesh's bounding box?
             meshBoundingBox.setFromObject(mesh);
-            
-            if (meshBoundingBox.intersectsSphere(worldSelectionSphere)) {
-                // This mesh is a candidate. Now, cast rays to find the closest point of entry/exit.
-                
-                // 3. Raycast in 6 directions from the sphere center
-                for (const directionVector of rayDirections) {
-                    // Set raycaster origin and direction
-                    raycaster.set(sphereOrigin, directionVector);
-                    
-                    // Only check the current candidate mesh, not all meshes
-                    const intersects = raycaster.intersectObject(mesh, false);
 
-                    if (intersects.length > 0) {
-                        if (intersects.length % 2 !== 0) { // If number of hits is odd (starting inside)
-                            const hit = intersects[0];
-                            // Find the closest raycast hit distance among all rays for this mesh
-                            if (hit.distance < minDistance) {
-                                minDistance = hit.distance;
-                                closestHit = hit;
-                                closestMesh = mesh;
-                            }
-                        } else { // If number of hits is even (starting outside)
-                            const hit = intersects[0];
-                            if (hit.distance < minDistance && hit.distance < sphereRadius) {
-                                minDistance = hit.distance;
-                                closestHit = hit;
-                                closestMesh = mesh;
-                            }
-                        }
+            if (!meshBoundingBox.intersectsSphere(worldSelectionSphere)) continue;
+
+            // Narrow phase: BVH-accelerated raycasts
+            for (const directionVector of rayDirections) {
+                raycaster.set(sphereOrigin, directionVector);
+
+                // This will use acceleratedRaycast() automatically
+                const intersects = raycaster.intersectObject(mesh, false);
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    if (hit.distance < minDistance && hit.distance < sphereRadius * 1.5) {
+                        minDistance = hit.distance;
+                        closestMesh = mesh;
                     }
                 }
             }
         }
 
-        // Return the closest mesh found that passed the AABB check
         return closestMesh;
     }
+
 
     /**
      * Salva il parent originale, la posizione locale e **la rotazione locale** di un oggetto.
