@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
 import { InteractiveGroup } from 'three/addons/interactive/InteractiveGroup.js';
+import { ControllerManager } from './controller';
 
 /**
  * UIManager class to handle the creation and management of HTML-based VR menus (HTMLMesh).
@@ -9,25 +10,27 @@ export class UIManager {
     private scene: THREE.Scene;
     private renderer: THREE.WebGLRenderer;
     private camera: THREE.PerspectiveCamera;
-    private controller0: THREE.XRTargetRaySpace;
+    private controllers: ControllerManager['leftController'][];
     private interactiveGroup: InteractiveGroup;
 
     /**
      * @param scene The main Three.js scene.
      * @param renderer The WebGLRenderer.
      * @param camera The camera.
-     * @param controller0 The primary VR controller (for interaction listening).
+     * @param controller The VR controllers (for interaction listening).
      */
-constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controller0: THREE.XRTargetRaySpace) {
+constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerManager: ControllerManager) {
         this.scene = scene;
         this.renderer = renderer;
         this.camera = camera;
-        this.controller0 = controller0;
+        this.controllers = [controllerManager.rightController, controllerManager.leftController];
         
         // Create a single InteractiveGroup to manage all UI meshes
         this.interactiveGroup = new InteractiveGroup();
         this.interactiveGroup.listenToPointerEvents( this.renderer, this.camera );
-        this.interactiveGroup.listenToXRControllerEvents(this.controller0);
+        for(const controller of this.controllers){
+            this.interactiveGroup.listenToXRControllerEvents(controller.tip);
+        }
         this.scene.add(this.interactiveGroup);
     }
 
@@ -97,9 +100,9 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
  * @param controllerRefs The object containing controller references.
  * @returns The initialized UIManager instance.
  */
-export function initUI(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerRefs: any): UIManager {
+export function initUI(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerManager: ControllerManager): UIManager {
     // Assuming controllerRefs.controller0 is the primary controller (THREE.Group)
-    return new UIManager(scene, renderer, camera, controllerRefs.controller0);
+    return new UIManager(scene, renderer, camera, controllerManager);
 }
 
 export function menuCallback(payload: any){

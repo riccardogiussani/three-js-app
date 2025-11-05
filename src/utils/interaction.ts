@@ -165,9 +165,7 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
 
     /*--- PRIVATE METHODS ---*/
 
-    /**
-    * Helper function to find the root of the GLTF model
-    **/
+    // Helper function to find the root of the GLTF model
     findModelRoot(mesh: THREE.Object3D): THREE.Object3D {
         let root: THREE.Object3D = mesh;
         while (root.parent && root.parent !== this.scene) {

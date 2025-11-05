@@ -9,7 +9,7 @@ import { initLoaderManager, LoaderManager } from './utils/model.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 import { ButtonEvent } from './utils/controller.ts';
 
-// 1. Setup the Scene, Camera, and Renderer
+// Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
@@ -17,24 +17,42 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// Add lighting
+camera.position.z = 5;
+
+// Add Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
-camera.position.z = 5;
-
-let eventManager: EventManager = initEventManager('*');
-
-import { menuCallback } from './utils/ui.ts';
-eventManager.registerAction('menu', menuCallback);
-
+// Setup scene Managers
+const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for production
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
 const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
+const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
 
+const environmentPath = './models/environment.glb';
+loaderManager.create(environmentPath, false);
+
+const modelPath = './models/v12.glb'; 
+loaderManager.create(modelPath);
+
+uiManager.create(
+    './menus/menu.html',
+    new THREE.Vector3(0, 1.5, -1),
+    new THREE.Euler(0, 0, 0),
+    1,
+    'Main VR Menu'
+);
+
+// #region ui events
+import { menuCallback } from './utils/ui.ts';
+eventManager.registerAction('menu', menuCallback);
+// #endregion
+
+// #region right controller events
 controllerManager.rightController.tip.addEventListener('selectstart', onSelectStart);
 controllerManager.rightController.tip.addEventListener('selectend', onSelectEnd);
 controllerManager.rightController.tip.addEventListener('squeezestart', onSqueezeStart);
@@ -46,7 +64,9 @@ controllerManager.rightController.tip.addEventListener('secondreleased' as any, 
 controllerManager.rightController.tip.addEventListener('thumbstickpressed' as any, onGenericButtonPressed);
 controllerManager.rightController.tip.addEventListener('thumbstickreleased' as any, onGenericButtonPressed);
 //controllerManager.rightController.tip.addEventListener('thumbstickmoved' as any, onGenericButtonPressed);
+// #endregion
 
+// #region left controller events
 controllerManager.leftController.tip.addEventListener('selectstart', onSelectStart);
 controllerManager.leftController.tip.addEventListener('selectend', onSelectEnd);
 controllerManager.leftController.tip.addEventListener('squeezestart', onSqueezeStart);
@@ -58,8 +78,9 @@ controllerManager.leftController.tip.addEventListener('secondreleased' as any, o
 controllerManager.leftController.tip.addEventListener('thumbstickpressed' as any, onGenericButtonPressed);
 controllerManager.leftController.tip.addEventListener('thumbstickreleased' as any, onGenericButtonPressed);
 //controllerManager.rightController.tip.addEventListener('thumbstickmoved' as any, onGenericButtonPressed);
+// #endregion
 
-
+// #region controllers callbacks
 function onSelectStart(event: THREE.Event) {
     const controllerTip = event.target;
     const selectionSphere = (controllerTip as any).selectionSphere;
@@ -94,23 +115,9 @@ function onXPressed(event: THREE.Event){
 function onGenericButtonPressed(event:any){
     console.log(event)
 }
+// #endregion
 
-const environmentPath = './models/environment.glb';
-loaderManager.create(environmentPath, false);
-
-const modelPath = './models/v12.glb'; 
-loaderManager.create(modelPath);
-
-/*const uiManager: UIManager = initUI(scene, renderer, camera, controllerRefs);
-uiManager.create(
-    './menus/menu.html',
-    new THREE.Vector3(0, 1.5, -1), // Position: center, 1.5m high, 1m in front
-    new THREE.Euler(0, 0, 0),      // Rotation: no rotation
-    1,                             // Scale: 0.005
-    'Main VR Menu'                 // Name
-);*/
-
-
+// #region misc
 // Called by index.html when the 'Start VR' button is clicked.
 export async function startVRSession(session: XRSession): Promise<void> {
     console.log("Starting VR Session...");
@@ -130,6 +137,7 @@ function onWindowResize(){
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', onWindowResize);
+// #endregion
 
 function animate(time?: number) {
     renderer.render(scene, camera);
