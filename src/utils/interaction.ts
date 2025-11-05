@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { setHighlight } from './visual';
+import { ControllerManager } from './controller';
 
 // Bounding boxes used for intersection calculations
 const meshBoundingBox = new THREE.Box3();
@@ -19,7 +20,7 @@ export class InteractionManager {
     private scene: THREE.Scene;
     private renderer: THREE.WebGLRenderer;
     private camera: THREE.PerspectiveCamera;
-    private controllerGrip0: THREE.XRTargetRaySpace;
+    private controllerGrips: Map<XRHandedness, THREE.XRTargetRaySpace>;
     /**
      * A list of all meshes in the scene that can be interacted with.
      * This will be populated by the GLTFLoader.
@@ -43,14 +44,19 @@ export class InteractionManager {
      * @param camera The camera.
      * @param controller0 The primary VR controller (for interaction listening).
      */
-constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerGrip0: THREE.XRTargetRaySpace) {
+constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerManager:ControllerManager) {
         this.scene = scene;
         this.renderer = renderer;
         this.camera = camera;
-        this.controllerGrip0 = controllerGrip0;
+        this.controllerGrips = new Map<XRHandedness, THREE.XRTargetRaySpace>;
         this.grabbableMeshes = [];
         this.selectedObject = null;
         this.grabbedObject = null;
+
+        for (const controller of [controllerManager.leftController, controllerManager.rightController]){
+            const handedness = (controller.tip as any).handedness;
+            this.controllerGrips.set(handedness,controller.grip);
+        } 
     }
 
     public select(obj: THREE.Object3D){
@@ -105,7 +111,7 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
         this.storeOriginalState(mesh);
     }
 
-    public grab(obj: THREE.Mesh){
+    public grab(handedness:XRHandedness){
         if(!this.selectedObject)
             return;
 
@@ -114,24 +120,18 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
 
         // Attach the object to the CONTROLLER GRIP
         // This makes the object move with the controller
-        this.controllerGrip0.attach(this.grabbedObject);
+        this.controllerGrips.get(handedness)?.attach(this.grabbedObject);
         console.log("Grabbed object:", this.grabbedObject.name);
     }
 
     public release(){
         // Check if we are currently holding an object
         if (this.grabbedObject) {
-
-            // Attach the object back to the main SCENE
-            // This makes it independent of the controller again
             this.scene.attach(this.grabbedObject);
 
-            const reattached = this.checkAndReattach(this.grabbedObject, 0.05); //TODO: First check reattach, then IN CASE re-attach to scene
-    
-            if(reattached){
+            if(this.isReattach(this.grabbedObject, 0.05)){
+                this.reattach(this.grabbedObject);
                 this.deselect();
-                //setHighlight(this.grabbedObject, false);
-                //thisselectedObject = null;
             }
             
             console.log("Released object:", this.grabbedObject.name);
@@ -140,7 +140,9 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
         }
     }
 
-    public tryGrab(sphere: THREE.Mesh){
+    public tryGrab(tip: THREE.XRTargetRaySpace){
+        const sphere:THREE.Mesh = (tip as any).selectionSphere;
+        const handedness:XRHandedness = (tip as any).handedness;
         // Check if we have an object selected AND we aren't already holding something
         if (this.selectedObject && !this.grabbedObject) {
             // Gather all mesh descendants of the selected object for intersection check
@@ -154,7 +156,7 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
             const intersectingMesh = this.checkIntersection(sphere, meshesToCheck);
     
             if (intersectingMesh) {
-                this.grab(intersectingMesh);
+                this.grab(handedness);
             } else {
                 console.log("Squeeze attempted, but selection sphere is not intersecting the selected object.");
             }
@@ -260,15 +262,7 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
         }
     }
 
-    /**
-     * Controlla se l'oggetto è stato posizionato entro la tolleranza e lo ri-attacca
-     * al suo parent originale nella sua posizione locale e **rotazione locale** originale.
-     * @param object L'oggetto rilasciato (normalmente il 'grabbedObject').
-     * @param scene La THREE.Scene, necessaria perché l'oggetto viene ri-attaccato a essa se non soddisfa la condizione.
-     * @param tolerance Il raggio di tolleranza per il ri-attacco (es. 0.01 per 1cm).
-     * @returns True se l'oggetto è stato ri-attaccato, False altrimenti.
-     */
-    checkAndReattach(object: THREE.Object3D, tolerance: number = 0.01): boolean {
+    isReattach(object: THREE.Object3D, tolerance: number = 0.01): boolean {
         const originalParent = object.userData.originalParent as THREE.Object3D | undefined;
         const originalLocalPosition = object.userData.originalLocalPosition as THREE.Vector3 | undefined;
         const originalLocalRotation = object.userData.originalLocalRotation as THREE.Quaternion | undefined;
@@ -277,47 +271,44 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
         if (!originalParent || !originalLocalPosition || !originalLocalRotation) {
             return false;
         }
-        
-        // 1. Calcola la posizione 'Target' (posizione mondiale che l'oggetto dovrebbe avere)
+
         const targetParentMatrix = originalParent.matrixWorld.clone();
         const targetWorldPosition = originalLocalPosition.clone().applyMatrix4(targetParentMatrix);
 
-        // 2. Calcola la posizione 'Current' (posizione mondiale attuale dell'oggetto)
         object.updateWorldMatrix(true, false);
         const currentWorldPosition = new THREE.Vector3();
         object.getWorldPosition(currentWorldPosition);
 
-        // 3. Verifica la distanza tra le due posizioni mondiali
-        // === CORREZIONE PER L'ERRORE DI TIPO ===
-        // Calcola la distanza al quadrato manualmente per evitare la chiamata a 'distanceToSq'
-        const dx = currentWorldPosition.x - targetWorldPosition.x;
-        const dy = currentWorldPosition.y - targetWorldPosition.y;
-        const dz = currentWorldPosition.z - targetWorldPosition.z;
-        const distanceSq = dx * dx + dy * dy + dz * dz;
-
+        const distanceSq = 
+            (currentWorldPosition.x - targetWorldPosition.x)*(currentWorldPosition.x - targetWorldPosition.x)+
+            (currentWorldPosition.y - targetWorldPosition.y)*(currentWorldPosition.y - targetWorldPosition.y)+
+            (currentWorldPosition.z - targetWorldPosition.z)*(currentWorldPosition.z - targetWorldPosition.z);
         const toleranceSq = tolerance * tolerance;
-
+        
         if (distanceSq <= toleranceSq) {
-            // La condizione è soddisfatta: ri-attacca l'oggetto!
-            
-            // Prima, rimuoviamo l'oggetto dalla SCENA (dove è stato rilasciato)
-            this.scene.remove(object); 
-            
-            // Ora, ri-attacchiamolo al parent originale
-            originalParent.add(object);
-            
-            // Imposta la posizione locale alla posizione originale salvata
-            object.position.copy(originalLocalPosition);
-            
-            // Ripristina la rotazione locale salvata
-            object.quaternion.copy(originalLocalRotation);
-            
-            console.log(`Ri-attaccato ${object.name} al parent originale: ${originalParent.name}. Distanza²: ${distanceSq.toFixed(5)}`);
             return true;
         }
-        
-        // Non ri-attaccato: rimarrà attaccato alla SCENA
+
         return false;
+    }
+    
+    reattach(object:THREE.Object3D){
+        const originalParent = object.userData.originalParent as THREE.Object3D | undefined;
+        const originalLocalPosition = object.userData.originalLocalPosition as THREE.Vector3 | undefined;
+        const originalLocalRotation = object.userData.originalLocalRotation as THREE.Quaternion | undefined;
+
+        if (!originalParent || !originalLocalPosition || !originalLocalRotation) {
+            console.warn(`Unable to find a parent or a location for ${object.name}`)
+            return;
+        }
+
+        this.scene.remove(object); 
+        originalParent.add(object);
+        
+        object.position.copy(originalLocalPosition);
+        object.quaternion.copy(originalLocalRotation);
+        
+        console.log(`Re-attached ${object.name} to original parent: ${originalParent.name}`);
     }
 }
 
@@ -329,7 +320,7 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
  * @param camera The camera.
  * @returns The initialized InteractionManager instance.
  */
-export function initInteraction(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerRefs: any): InteractionManager {
+export function initInteraction(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, controllerManager: ControllerManager): InteractionManager {
     // Assuming controllerRefs.controller0 is the primary controller (THREE.Group)
-    return new InteractionManager(scene, renderer, camera, controllerRefs);
+    return new InteractionManager(scene, renderer, camera, controllerManager);
 }

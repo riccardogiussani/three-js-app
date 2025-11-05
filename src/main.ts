@@ -1,12 +1,13 @@
-// main.ts (Refactored)
+// main.ts
 
 import * as THREE from 'three'; 
 
 import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';
 import { initEventManager, EventManager } from './utils/events.ts';
-
-import { createControllers } from './controller.ts';
+import { initLoaderManager, LoaderManager } from './utils/model.ts';
+import { initControllers, ControllerManager } from './utils/controller.ts';
+import { ButtonEvent } from './utils/controller.ts';
 
 // 1. Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -25,134 +26,113 @@ scene.add(directionalLight);
 
 camera.position.z = 5;
 
+let eventManager: EventManager = initEventManager('*');
 
-// Get all controller references, including the new grips and spheres
-const controllerRefs = createControllers(renderer, scene);
-const { 
-    controller0, 
-    rayLine0, 
-    controllerGrip0, 
-    selectionSphere0,
-    // You can use these for the second controller
-    // controller1, rayLine1, controllerGrip1, selectionSphere1
-} = controllerRefs;
+import { menuCallback } from './utils/ui.ts';
+eventManager.registerAction('menu', menuCallback);
 
-const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerGrip0);
+const controllerManager:ControllerManager = initControllers(scene, renderer);
+const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
+const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
 
-// --- Register Event Listeners for Controller 0 ---
-controller0.addEventListener('selectstart', onSelectStart0);
-controller0.addEventListener('selectend', onSelectEnd0);
-controller0.addEventListener('squeezestart', onSqueezeStart0);
-controller0.addEventListener('squeezeend', onSqueezeEnd0);
+controllerManager.rightController.tip.addEventListener('selectstart', onSelectStart);
+controllerManager.rightController.tip.addEventListener('selectend', onSelectEnd);
+controllerManager.rightController.tip.addEventListener('squeezestart', onSqueezeStart);
+controllerManager.rightController.tip.addEventListener('squeezeend', onSqueezeEnd);
+controllerManager.rightController.tip.addEventListener('firstpressed' as any, onAPressed);
+controllerManager.rightController.tip.addEventListener('firstreleased' as any, onGenericButtonPressed);
+controllerManager.rightController.tip.addEventListener('secondpressed' as any, onGenericButtonPressed);
+controllerManager.rightController.tip.addEventListener('secondreleased' as any, onGenericButtonPressed);
+controllerManager.rightController.tip.addEventListener('thumbstickpressed' as any, onGenericButtonPressed);
+controllerManager.rightController.tip.addEventListener('thumbstickreleased' as any, onGenericButtonPressed);
+//controllerManager.rightController.tip.addEventListener('thumbstickmoved' as any, onGenericButtonPressed);
 
-// Bounding box constants and highlightMaterial are now in utils.ts
+controllerManager.leftController.tip.addEventListener('selectstart', onSelectStart);
+controllerManager.leftController.tip.addEventListener('selectend', onSelectEnd);
+controllerManager.leftController.tip.addEventListener('squeezestart', onSqueezeStart);
+controllerManager.leftController.tip.addEventListener('squeezeend', onSqueezeEnd);
+controllerManager.leftController.tip.addEventListener('firstpressed' as any, onXPressed);
+controllerManager.leftController.tip.addEventListener('firstreleased' as any, onGenericButtonPressed);
+controllerManager.leftController.tip.addEventListener('secondpressed' as any, onGenericButtonPressed);
+controllerManager.leftController.tip.addEventListener('secondreleased' as any, onGenericButtonPressed);
+controllerManager.leftController.tip.addEventListener('thumbstickpressed' as any, onGenericButtonPressed);
+controllerManager.leftController.tip.addEventListener('thumbstickreleased' as any, onGenericButtonPressed);
+//controllerManager.rightController.tip.addEventListener('thumbstickmoved' as any, onGenericButtonPressed);
 
-function onSelectStart0(event: THREE.Event) {
+
+function onSelectStart(event: THREE.Event) {
+    const controllerTip = event.target;
+    const selectionSphere = (controllerTip as any).selectionSphere;
     // Visual feedback: Make the selection sphere green
-    (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00); 
-    interactionManager.trySelect(selectionSphere0);    
+    (selectionSphere.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00); 
+    interactionManager.trySelect(selectionSphere);    
 }
-function onSelectEnd0(event: THREE.Event) {
+function onSelectEnd(event: THREE.Event) {
+    const controllerTip = event.target;
+    const selectionSphere = (controllerTip as any).selectionSphere;
     // Reset sphere color to white (default)
-    (selectionSphere0.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
+    (selectionSphere.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
 }
-function onSqueezeStart0(event: THREE.Event) {
-    interactionManager.tryGrab(selectionSphere0);
+function onSqueezeStart(event: THREE.Event) {
+    const controllerTip = event.target; 
+    
+    interactionManager.tryGrab(controllerTip as THREE.XRTargetRaySpace);
 }
-function onSqueezeEnd0(event: THREE.Event) {
+function onSqueezeEnd(event: THREE.Event) {
     interactionManager.release();
 }
-
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-
-const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/' ); 
-const loader = new GLTFLoader();
-loader.setDRACOLoader( dracoLoader );
-
-const modelPath = './models/v12.glb'; 
-loader.load( 
-    modelPath, 
-    // Success callback
-    function ( gltf ) {
-		scene.add( gltf.scene );
-
-        gltf.scene.traverse((child) => {
-            // We only want to interact with Meshes
-            if (child instanceof THREE.Mesh) {
-                const mesh = child;
-                interactionManager.setGrabbable(mesh);
-                //console.log('Found grabbable mesh:', mesh.name);
-            }
-        });
-    },
-    // Progress callback
-    function ( xhr ) {
-		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-	},
-    // Error callback
-    function ( error ) {
-        console.error( 'Loading error:', error );
-    }
-);
+function onAPressed(event: THREE.Event){
+    const controllerTip = event.target;
+    
+    console.log("A button pressed!");
+}
+function onXPressed(event: THREE.Event){
+    const controllerTip = event.target;
+    
+    console.log("X button pressed!");
+}
+function onGenericButtonPressed(event:any){
+    console.log(event)
+}
 
 const environmentPath = './models/environment.glb';
-loader.load(
-	environmentPath,
-	function ( gltf ) {
-		scene.add( gltf.scene );
-	},
-	function ( xhr ) {
-		console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
-	},
-	function ( error ) {
-		console.log( 'An error happened', error );
-	}
-);
+loaderManager.create(environmentPath, false);
 
-const uiManager: UIManager = initUI(scene, renderer, camera, controllerRefs);
+const modelPath = './models/v12.glb'; 
+loaderManager.create(modelPath);
+
+/*const uiManager: UIManager = initUI(scene, renderer, camera, controllerRefs);
 uiManager.create(
     './menus/menu.html',
     new THREE.Vector3(0, 1.5, -1), // Position: center, 1.5m high, 1m in front
     new THREE.Euler(0, 0, 0),      // Rotation: no rotation
     1,                             // Scale: 0.005
     'Main VR Menu'                 // Name
-);
+);*/
 
-import { menuCallback } from './utils/ui.ts';
-let eventManager: EventManager = initEventManager('*');
-eventManager.registerAction('menu', menuCallback);
 
-/*
- Called by index.html when the 'Start VR' button is clicked.
-*/
+// Called by index.html when the 'Start VR' button is clicked.
 export async function startVRSession(session: XRSession): Promise<void> {
     console.log("Starting VR Session...");
     await renderer.xr.setSession(session);
     renderer.setClearColor(0x000000);
 }
 
-/*
- Called by index.html when the XRSession 'end' event is fired.
-*/
+// Called by index.html when the XRSession 'end' event is fired.
 export function endVRSession(): void {
     console.log("Ending VR Session cleanup...");
     renderer.setClearColor(0x000000);
 }
 
-// 3. Create the Animate/Render Loop
-function animate(time?: number) {
-    // Render the scene
-    renderer.render(scene, camera);
-}
-
-// 4. Handle window resizing
-window.addEventListener('resize', () => {
+function onWindowResize(){
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-});
+}
+window.addEventListener('resize', onWindowResize);
 
-// Start the animation loop
+function animate(time?: number) {
+    renderer.render(scene, camera);
+    controllerManager.update();
+}
 renderer.setAnimationLoop(animate);
