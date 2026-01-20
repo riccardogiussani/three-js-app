@@ -1,3 +1,15 @@
+/**
+ * interaction.ts
+ * 
+ * This module manages user interaction within the three.js scene, including object selection,
+ * grabbing, and releasing using VR controllers.
+ * 
+ * It provides the InteractionManager class which handles raycasting for selection,
+ * managing grabbable objects, and attaching/detaching objects to controllers.
+ * 
+ * The module exports an initInteraction function to initialize the InteractionManager.
+ */
+
 import * as THREE from 'three';
 import { setHighlight } from './visual';
 import { ControllerManager } from './controller';

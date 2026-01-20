@@ -1,7 +1,16 @@
 /**
- * Manages communication from embedded HTML UI (like an HTMLMesh) back to the main
- * Three.js application using the window.postMessage API.
+ * events.ts
+ * 
+ * This module manages communication from embedded HTML UI elements (such as HTMLMesh)
+ * back to the main three.js application using the window.postMessage API.
+ * 
+ * It provides the EventManager class which registers action handlers,
+ * listens for window messages, verifies message origins, and dispatches
+ * actions to the appropriate handlers.
+ * 
+ * The module exports an initEventManager function to create and start an EventManager instance.
  */
+
 export class EventManager {
     private handlerMap: Map<string, ActionHandler>;
     private allowedOrigin: string; // Used for security in a real application

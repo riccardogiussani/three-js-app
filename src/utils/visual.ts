@@ -1,3 +1,14 @@
+/**
+ * visual.ts
+ * 
+ * This module manages visual effects and post-processing for the three.js scene.
+ * It provides functions and classes for highlighting objects and managing visual effects
+ * such as outlines and anti-aliasing using EffectComposer and related passes.
+ * 
+ * The module exports the setHighlight function and the VFXManager class,
+ * as well as a singleton getter for the VFXManager instance.
+ */
+
 import * as THREE from 'three';
 
 // A distinct material for highlighting selected objects

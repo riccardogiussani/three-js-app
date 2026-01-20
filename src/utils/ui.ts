@@ -1,3 +1,13 @@
+/**
+ * ui.ts
+ * 
+ * This module manages the creation and management of HTML-based VR menus using HTMLMesh.
+ * It provides the UIManager class which handles loading HTML menus as 3D meshes,
+ * positioning them in the scene, and managing interaction via InteractiveGroup.
+ * 
+ * The module exports an initUI function to initialize the UIManager.
+ */
+
 import * as THREE from 'three';
 import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
 import { InteractiveGroup } from 'three/addons/interactive/InteractiveGroup.js';

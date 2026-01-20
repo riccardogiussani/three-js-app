@@ -1,4 +1,14 @@
-// controller.ts
+/**
+ * controller.ts
+ * 
+ * This module manages VR controllers within the three.js scene.
+ * It provides the ControllerManager class which handles controller setup,
+ * event listeners for connection and disconnection, button state polling,
+ * and dispatching custom events for controller input actions.
+ * 
+ * It also exports an initControllers function to initialize the controllers,
+ * and helper functions to create visual elements like selection spheres and ray lines.
+ */
 
 import * as THREE from 'three';
 import { WebGLRenderer } from 'three';
@@ -241,4 +251,3 @@ function createRayLine(length=20){
 
     return rayLine;
 }
-

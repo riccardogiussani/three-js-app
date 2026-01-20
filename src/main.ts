@@ -1,13 +1,17 @@
-// main.ts
+
+/**
+ * main.ts
+ * 
+ * This is the main entry point of the three.js VR application.
+ * It sets up the scene, camera, renderer, lighting, and initializes all managers
+ * for UI, interaction, events, controllers, and model loading.
+ * 
+ * It also configures VR controller event listeners and handles the animation loop.
+ * 
+ * The module exports functions to start and end the VR session.
+ */
 
 import * as THREE from 'three';
-
-/*
-import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
-THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
-THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
-THREE.Mesh.prototype.raycast = acceleratedRaycast;
-*/
 
 import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';
