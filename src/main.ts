@@ -19,6 +19,7 @@ import { initEventManager, EventManager } from './utils/events.ts';
 import { initLoaderManager, LoaderManager } from './utils/model.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 //import { ButtonEvent } from './utils/controller.ts';
+import { initAgentManager, AgentManager } from './utils/agent.ts';
 
 // Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -45,6 +46,7 @@ directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
 // Setup scene Managers
+const agentManager: AgentManager = initAgentManager(scene, 'http://localhost:3000');
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
