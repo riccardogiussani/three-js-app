@@ -20,6 +20,7 @@ import { initLoaderManager, LoaderManager } from './utils/model.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 //import { ButtonEvent } from './utils/controller.ts';
 import { initAgentManager, AgentManager } from './utils/agent.ts';
+import { initVoice } from './utils/voice.ts';
 
 // Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -47,11 +48,14 @@ scene.add(directionalLight);
 
 // Setup scene Managers
 const agentManager: AgentManager = initAgentManager(scene, 'http://localhost:3000');
+const voice = initVoice("af_heart");
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
 const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
 const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
+
+voice.speak("System online. Welcome back.");
 
 const environmentPath = './models/environment.glb';
 loaderManager.create(environmentPath, false);
