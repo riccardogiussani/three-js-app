@@ -13,6 +13,15 @@ import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
 import { InteractiveGroup } from 'three/addons/interactive/InteractiveGroup.js';
 import { ControllerManager } from './controller';
 
+// Interface to store attachment details
+interface UIAttachment {
+    mesh: THREE.Object3D;
+    target: THREE.Object3D;
+    localPos: THREE.Vector3;
+    localRot: THREE.Quaternion;
+    lookAt?: THREE.Object3D; // New optional property
+}
+
 /**
  * UIManager class to handle the creation and management of HTML-based VR menus (HTMLMesh).
  */
@@ -22,6 +31,8 @@ export class UIManager {
     private camera: THREE.PerspectiveCamera;
     private controllers: ControllerManager['leftController'][];
     private interactiveGroup: InteractiveGroup;
+
+    private attachments: UIAttachment[] = [];
 
     /**
      * @param scene The main Three.js scene.
@@ -81,6 +92,8 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
             
             // 3. Create the HTMLMesh
             const mesh = new HTMLMesh(domElement);
+
+            mesh.userData.element = domElement;
             
             // 4. Apply transformations
             mesh.position.copy(position);
@@ -97,6 +110,67 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
         } catch (error) {
             console.error(`Error creating VR UI Mesh from ${htmlPath}:`, error);
             return null;
+        }
+    }
+
+    /**
+     * Soft-attaches a UI Mesh (or its loading promise) to a target object.
+     * @param meshOrPromise The existing mesh OR the promise returned by create().
+     * @param target The object to follow (e.g., controller.tip).
+     * @param positionOffset Local position offset (x, y, z).
+     * @param rotationOffset Local rotation offset (x, y, z) in radians.
+     * @param lookAtTarget Optional: The object to face (usually the camera).
+     */
+    public attach(
+        meshOrPromise: THREE.Object3D | Promise<HTMLMesh | null>, 
+        target: THREE.Object3D, 
+        positionOffset: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
+        rotationOffset: THREE.Euler = new THREE.Euler(0, 0, 0),
+        lookAtTarget?: THREE.Object3D // New argument
+    ) {
+        const register = (mesh: THREE.Object3D) => {
+            const qOffset = new THREE.Quaternion().setFromEuler(rotationOffset);
+            this.attachments.push({
+                mesh: mesh,
+                target: target,
+                localPos: positionOffset,
+                localRot: qOffset,
+                lookAt: lookAtTarget
+            });
+        };
+
+        if (meshOrPromise instanceof Promise) {
+            meshOrPromise.then((mesh) => { if (mesh) register(mesh); });
+        } else if (meshOrPromise) {
+            register(meshOrPromise);
+        }
+    }
+
+    /**
+     * Updates positions of all attached UI elements.
+     * Call this in your animation loop.
+     */
+    public update() {
+        const targetWorldPos = new THREE.Vector3();
+        const targetWorldQuat = new THREE.Quaternion();
+        const finalPos = new THREE.Vector3();
+
+        for (const att of this.attachments) {
+            // 1. Calculate World Position (Standard Soft Attach)
+            att.target.getWorldPosition(targetWorldPos);
+            att.target.getWorldQuaternion(targetWorldQuat);
+
+            finalPos.copy(att.localPos).applyQuaternion(targetWorldQuat);
+            att.mesh.position.copy(targetWorldPos).add(finalPos);
+
+            // 2. Handle Rotation: Either LookAt OR Soft Attach Rotation
+            if (att.lookAt) {
+                // Constraint: Always face the specific target (e.g., Head)
+                att.mesh.lookAt(att.lookAt.position);
+            } else {
+                // Standard: Follow the controller's rotation
+                att.mesh.quaternion.copy(targetWorldQuat).multiply(att.localRot);
+            }
         }
     }
 }

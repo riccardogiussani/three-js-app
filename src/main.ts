@@ -71,6 +71,69 @@ uiManager.create(
     'Main VR Menu'
 );
 
+const chatPromise = uiManager.create(
+    './menus/chat.html',
+    new THREE.Vector3(0, 0, 0), // Initial pos doesn't matter, it gets overwritten
+    new THREE.Euler(0, 0, 0),
+    1,
+    'Chat Menu'
+);
+
+uiManager.attach(
+    chatPromise, 
+    controllerManager.leftController.tip, // Target
+    new THREE.Vector3(0, 0, -0.05),        // Position Offset
+    new THREE.Euler(-Math.PI / 4, 0, 0),   // Rotation Offset (tilted up slightly)
+    camera
+);
+
+// TODO: Refactor and restructure chatPromise, send messages (tap to send versus press to record?)
+chatPromise.then((mesh) => {
+    if (!mesh) return;
+
+    const container = mesh.userData.element as HTMLElement;
+    
+    // Keep track of the paragraph currently being written to
+    let activeLine: HTMLElement | null = null;
+
+    voiceManager.onMessage = (data: any) => {
+        // 1. Safety check
+        if (!data || typeof data.transcript === 'undefined') return;
+
+        const text = data.transcript;
+        const isFinal = data.end_of_turn;
+
+        // 2. If we don't have an active line, create one
+        if (!activeLine) {
+            activeLine = document.createElement('p');
+            activeLine.style.margin = '0 0 5px 0'; // Add some spacing
+            container.appendChild(activeLine);
+        }
+
+        // 3. Update the content
+        // If text is empty and it's not final, we might want to skip or show '...'
+        if (text.length > 0) {
+            activeLine.textContent = text;
+        }
+
+        // 4. Apply styling based on status
+        if (isFinal) {
+            activeLine.style.color = '#FFFFFF'; // White for definitive
+            activeLine = null; // Release reference so next message creates new line
+        } else {
+            activeLine.style.color = '#A0A0A0'; // Light Grey for temporary
+        }
+
+        // 5. Auto-scroll to the bottom
+        container.scrollTop = container.scrollHeight;
+    };
+
+    voiceManager.onStatusChange = (status: string) => {
+        // Visual feedback on the border
+        container.style.borderColor = status === 'Recording' ? 'red' : 'rgba(255,255,255,0)';
+    };
+});
+
 // #endregion
 
 // #region ui events
@@ -187,5 +250,8 @@ function animate(time?: number) {
     controllerManager.update();
 
     stats.update();
+
+    // Updates soft attachments (movement)
+    uiManager.update();
 }
 renderer.setAnimationLoop(animate);
