@@ -36,7 +36,7 @@ export class LoaderManager {
                 scene.add(gltf.scene);
 
                 gltf.scene.traverse((child) => {
-                    console.log(child.name);
+                    //console.log(child.name);
                     if (child instanceof THREE.Mesh) {
                         // Compute BVH once — persistent spatial structure
                         //child.geometry.computeBoundsTree();
@@ -50,7 +50,7 @@ export class LoaderManager {
             },
             // Progress callback
             function ( xhr ) {
-                console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+                //console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
             },
             // Error callback
             function ( error ) {

@@ -10,6 +10,8 @@ export class AgentManager {
     private scene: THREE.Scene;
     private baseUrl: string;
 
+    public onResponse: ((text: string) => void) | null = null;
+
     constructor(scene: THREE.Scene, baseUrl: string = 'http://localhost:3000') {
         this.scene = scene;
         this.baseUrl = baseUrl;
@@ -46,6 +48,9 @@ export class AgentManager {
                 }
             } else {
                 console.log('%c[Agent] AI Response:', 'color: #00ff00', data.text);
+                if (this.onResponse && data.text) {
+                    this.onResponse(data.text);
+                }
             }
         } catch (err) {
             console.error('[Agent] Request failed:', err);
@@ -106,6 +111,9 @@ export class AgentManager {
             });
             const data = await response.json();
             console.log('%c[Agent] Final AI Response:', 'color: #00ff00', data.text);
+            if (this.onResponse && data.text) {
+                this.onResponse(data.text);
+            }
         } catch (err) {
             console.error('[Agent] Feedback failed:', err);
         }

@@ -20,7 +20,9 @@ import { initLoaderManager, LoaderManager } from './utils/model.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 //import { ButtonEvent } from './utils/controller.ts';
 import { initAgentManager, AgentManager } from './utils/agent.ts';
-import { initVoice } from './utils/voice.ts';
+import { initVoice, VoiceManager } from './utils/voice.ts';
+
+const BFF_URL = 'http://localhost:3000';
 
 // Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
@@ -47,15 +49,13 @@ directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
 // Setup scene Managers
-const agentManager: AgentManager = initAgentManager(scene, 'http://localhost:3000');
-const voice = initVoice("af_heart");
+const agentManager: AgentManager = initAgentManager(scene, BFF_URL);
+const voiceManager: VoiceManager = initVoice(BFF_URL);
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
 const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
 const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
-
-voice.speak("System online. Welcome back.");
 
 const environmentPath = './models/environment.glb';
 loaderManager.create(environmentPath, false);
@@ -71,8 +71,11 @@ uiManager.create(
     'Main VR Menu'
 );
 
+// #endregion
+
 // #region ui events
 import { menuCallback } from './utils/ui.ts';
+import { Voice } from '@cartesia/cartesia-js/api/index';
 eventManager.registerAction('menu', menuCallback);
 // #endregion
 
@@ -82,7 +85,7 @@ controllerManager.rightController.tip.addEventListener('selectend', onSelectEnd)
 controllerManager.rightController.tip.addEventListener('squeezestart', onSqueezeStart);
 controllerManager.rightController.tip.addEventListener('squeezeend', onSqueezeEnd);
 controllerManager.rightController.tip.addEventListener('firstpressed' as any, onAPressed);
-controllerManager.rightController.tip.addEventListener('firstreleased' as any, onGenericButtonPressed);
+controllerManager.rightController.tip.addEventListener('firstreleased' as any, onAReleased);
 controllerManager.rightController.tip.addEventListener('secondpressed' as any, onGenericButtonPressed);
 controllerManager.rightController.tip.addEventListener('secondreleased' as any, onGenericButtonPressed);
 controllerManager.rightController.tip.addEventListener('thumbstickpressed' as any, onGenericButtonPressed);
@@ -129,7 +132,20 @@ function onSqueezeEnd(event: THREE.Event) {
 function onAPressed(event: THREE.Event){
     const controllerTip = event.target;
     
-    console.log("A button pressed!");
+    console.log("A button pressed - Listening...");
+    // Visual feedback (optional): vibrate controller
+    //const controller = event.target as any; 
+    //if(controller.gamepad && controller.gamepad.hapticActuators && controller.gamepad.hapticActuators[0]) {
+    //    controller.gamepad.hapticActuators[0].pulse(1.0, 100);
+    //}
+
+    voiceManager.startRecording();
+}
+function onAReleased(event: THREE.Event){
+    const controllerTip = event.target;
+    
+    console.log("A button released!");
+    voiceManager.stopRecording();
 }
 function onXPressed(event: THREE.Event){
     const controllerTip = event.target;
@@ -146,6 +162,7 @@ function onGenericButtonPressed(event:any){
 export async function startVRSession(session: XRSession): Promise<void> {
     console.log("Starting VR Session...");
     await renderer.xr.setSession(session);
+    await voiceManager.initVoice();
     renderer.setClearColor(0x000000);
 }
 
@@ -156,6 +173,8 @@ export function endVRSession(): void {
 }
 
 function onWindowResize(){
+    if (renderer.xr.isPresenting) return;
+    
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -165,7 +184,7 @@ window.addEventListener('resize', onWindowResize);
 
 function animate(time?: number) {
     renderer.render(scene, camera);
-    //controllerManager.update();
+    controllerManager.update();
 
     stats.update();
 }
