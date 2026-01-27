@@ -24,6 +24,11 @@ import { initVoice, VoiceManager } from './utils/voice.ts';
 
 const BFF_URL = 'http://localhost:3000';
 
+let chatMesh: any = null;
+let pressTimer: any = null;
+let isRecordingState = false;
+const HOLD_THRESHOLD_MS = 300;
+
 // Setup the Scene, Camera, and Renderer
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -49,8 +54,8 @@ directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
 // Setup scene Managers
-const agentManager: AgentManager = initAgentManager(scene, BFF_URL);
 const voiceManager: VoiceManager = initVoice(BFF_URL);
+const agentManager: AgentManager = initAgentManager(scene, BFF_URL);
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager:ControllerManager = initControllers(scene, renderer);
 const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
@@ -87,58 +92,18 @@ uiManager.attach(
     camera
 );
 
-// TODO: Refactor and restructure chatPromise, send messages (tap to send versus press to record?)
 chatPromise.then((mesh) => {
     if (!mesh) return;
-
-    const container = mesh.userData.element as HTMLElement;
-    
-    // Keep track of the paragraph currently being written to
-    let activeLine: HTMLElement | null = null;
-
-    voiceManager.onMessage = (data: any) => {
-        // 1. Safety check
-        if (!data || typeof data.transcript === 'undefined') return;
-
-        const text = data.transcript;
-        const isFinal = data.end_of_turn;
-
-        // 2. If we don't have an active line, create one
-        if (!activeLine) {
-            activeLine = document.createElement('p');
-            activeLine.style.margin = '0 0 5px 0'; // Add some spacing
-            container.appendChild(activeLine);
-        }
-
-        // 3. Update the content
-        // If text is empty and it's not final, we might want to skip or show '...'
-        if (text.length > 0) {
-            activeLine.textContent = text;
-        }
-
-        // 4. Apply styling based on status
-        if (isFinal) {
-            activeLine.style.color = '#FFFFFF'; // White for definitive
-            activeLine = null; // Release reference so next message creates new line
-        } else {
-            activeLine.style.color = '#A0A0A0'; // Light Grey for temporary
-        }
-
-        // 5. Auto-scroll to the bottom
-        container.scrollTop = container.scrollHeight;
-    };
-
-    voiceManager.onStatusChange = (status: string) => {
-        // Visual feedback on the border
-        container.style.borderColor = status === 'Recording' ? 'red' : 'rgba(255,255,255,0)';
-    };
+    chatMesh = mesh;
+    voiceManager.onPartialTranscription = (text:string) => { uiManager.handlePartialTranscription(mesh, text)};
+    voiceManager.onFullTranscription = (text:string) => { uiManager.handleFullTranscription(mesh, text)};
+    agentManager.onResponse = (text:string) => {voiceManager.speak(text)};
 });
 
 // #endregion
 
 // #region ui events
 import { menuCallback } from './utils/ui.ts';
-import { Voice } from '@cartesia/cartesia-js/api/index';
 eventManager.registerAction('menu', menuCallback);
 // #endregion
 
@@ -193,22 +158,39 @@ function onSqueezeEnd(event: THREE.Event) {
     interactionManager.release();
 }
 function onAPressed(event: THREE.Event){
-    const controllerTip = event.target;
-    
-    console.log("A button pressed - Listening...");
-    // Visual feedback (optional): vibrate controller
-    //const controller = event.target as any; 
-    //if(controller.gamepad && controller.gamepad.hapticActuators && controller.gamepad.hapticActuators[0]) {
-    //    controller.gamepad.hapticActuators[0].pulse(1.0, 100);
-    //}
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => {
+        // --- HOLD ACTION (Start Recording) ---
+        isRecordingState = true;
+        console.log("Hold detected: Starting Recording...");
+        voiceManager.startRecording();
+    }, HOLD_THRESHOLD_MS);
 
-    voiceManager.startRecording();
+    //if user taps, if chatMenu contains text, 
+    // agentManager.sendMessage(chatmessage)
+    //else, if user keeps pressed for higher than a threshold
+    //voiceManager.startRecording();
 }
 function onAReleased(event: THREE.Event){
-    const controllerTip = event.target;
-    
-    console.log("A button released!");
-    voiceManager.stopRecording();
+    if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+    }
+
+    if (isRecordingState) {
+        console.log("Hold released: Stopping Recording...");
+        voiceManager.stopRecording();
+        isRecordingState = false; // Reset state
+    } else {
+        console.log("Tap detected...");
+        const textToSend = uiManager.handleSendMessage(chatMesh);
+        if(textToSend){
+            console.log("Sending: ", textToSend)
+            agentManager.sendMessage(textToSend);
+        }else{
+            console.log("Nothing to send...")
+        }
+    }
 }
 function onXPressed(event: THREE.Event){
     const controllerTip = event.target;

@@ -173,6 +173,84 @@ constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera: THREE.Per
             }
         }
     }
+
+    //TODO: Organize better chat-related UI functions, where should I refactor them?
+    public handlePartialTranscription(mesh: HTMLMesh, text: string) {
+        console.log("Entered handle partial transcription")
+        if (typeof text !== 'string') return;
+        console.log("Passed if not string")
+
+        const container = mesh.userData.element as HTMLElement;
+        
+        // Retrieve the active line from userData (Persistent storage)
+        let activeLine = mesh.userData.activeLine;
+        console.log(activeLine)
+
+        // If we don't have an active line, create one AND SAVE IT
+        if (!activeLine) {
+            activeLine = document.createElement('p');
+            activeLine.style.margin = '0 0 5px 0';
+            activeLine.style.color = '#A0A0A0'; 
+            container.appendChild(activeLine);
+            
+            // --- FIX: SAVE REFERENCE ---
+            mesh.userData.activeLine = activeLine;
+        }
+
+        if (text.length > 0) {
+            activeLine.textContent = text;
+        }
+
+        container.scrollTop = container.scrollHeight;
+    }
+
+    public handleFullTranscription(mesh: HTMLMesh, text: string) {
+        const container = mesh.userData.element as HTMLElement;
+        
+        // Retrieve the active line used during partial transcription
+        let activeLine = mesh.userData.activeLine;
+        
+        // Fallback: If no partial line existed, create one now
+        if (!activeLine) {
+            activeLine = document.createElement('p');
+            activeLine.style.margin = '0 0 5px 0';
+            container.appendChild(activeLine);
+        }
+
+        if (text.length > 0) {
+            activeLine.textContent = text;
+        }
+
+        activeLine.style.color = '#FFFFFF'; 
+
+        // --- FIX: CLEAR REFERENCE SO NEXT MESSAGE STARTS FRESH ---
+        mesh.userData.activeLine = null; 
+
+        container.scrollTop = container.scrollHeight;
+    }
+
+    public handleSendMessage(mesh:HTMLMesh){
+        if (!mesh || !mesh.userData.element) {
+            console.warn("Chat mesh not ready");
+            return;
+        }
+
+        // Get the last paragraph from the chat window
+        const container = mesh.userData.element as HTMLElement;
+        const lastParagraph = container.lastElementChild as HTMLElement;
+        const rawText = lastParagraph?.textContent || "";
+        const cleanedText = rawText.trim();
+        
+        if (cleanedText.length > 0) {
+            console.log(`Sending to Agent: "${cleanedText}"`);
+            // Optional: Visual feedback (e.g., change color to green)
+            lastParagraph.style.color = '#00ff00'; 
+            return cleanedText;
+        }
+
+        console.log("Nothing to send (empty or whitespace only).");
+        return null;
+    }
 }
 
 /**
@@ -189,6 +267,7 @@ export function initUI(scene: THREE.Scene, renderer: THREE.WebGLRenderer, camera
     return new UIManager(scene, renderer, camera, controllerManager);
 }
 
+// Example callback attached to menu
 export function menuCallback(payload: any){
     console.log(`Action called from menu! ${payload.value}`);
 }

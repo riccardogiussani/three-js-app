@@ -6,17 +6,23 @@
 
 export class VoiceManager {
     private socket: WebSocket | null = null;
+
     private audioContext: AudioContext | null = null;
     private processor: ScriptProcessorNode | null = null;
     private input: MediaStreamAudioSourceNode | null = null;
     private globalStream: MediaStream | null = null;
-    private baseUrl: string;
-    
+
+    private nextStartTime: number = 0;
+    private isPlaying: boolean = false;
+
     public isRecording: boolean = false;
+    private baseUrl: string;
     
     // Callback opzionali per UI e debugging
     public onStatusChange: ((status: string) => void) | null = null;
     public onMessage: ((data: any) => void) | null = null;
+    public onFullTranscription: ((text: string) => void) | null = null;
+    public onPartialTranscription: ((text: string) => void) | null = null;
 
     constructor(baseUrl: string = 'http://localhost:3000') {
         this.baseUrl = baseUrl;
@@ -31,20 +37,37 @@ export class VoiceManager {
         if (this.socket && (this.socket.readyState === WebSocket.OPEN)) return;
 
         this.socket = new WebSocket(this.baseUrl);
+        this.socket.binaryType = 'arraybuffer'; // Setup for binary audio if needed
 
         this.socket.onopen = () => {
             console.log('%c[WS] Connected', 'color: #00ff00');
-            this.onStatusChange?.("Connected");
+            //this.onStatusChange?.("Connected");
         };
 
-        this.socket.onmessage = (event) => {
+        this.socket.onmessage = async (event) => {
             try {
-                // Gestione base dei messaggi in arrivo (trascrizioni o comandi)
-                const data = JSON.parse(event.data);
-                console.log("[WS] Received:", data);
-                
-                if (this.onMessage) {
-                    this.onMessage(data);
+                let data;
+                if (typeof event.data === 'string') {
+                    data = JSON.parse(event.data);
+                    
+                    if (data.type === 'chunk' && data.data) {
+                        await this.scheduleAudioChunk(data.data);
+                        return;
+                    }
+                    
+                    if(data.transcript){
+                        if(data.end_of_turn){
+                            const finalText = data.utterance || data.transcript;
+                            if(this.onFullTranscription) this.onFullTranscription(finalText);
+                        }else{
+                            if(this.onPartialTranscription) this.onPartialTranscription(data.transcript);
+                        }
+                    }else{
+                        if (this.onMessage) this.onMessage(data);
+                    }
+                } else {
+                    // Handle raw binary if backend sends it (unlikely with current setup, but good practice)
+                    return; 
                 }
             } catch (e) {
                 console.error("[WS] Parse error", e);
@@ -53,10 +76,33 @@ export class VoiceManager {
 
         this.socket.onclose = () => {
             console.warn('[WS] Disconnected');
-            this.onStatusChange?.("Disconnected");
+            //this.onStatusChange?.("Disconnected");
         };
 
         this.socket.onerror = (err) => console.error('[WS] Error:', err);
+    }
+
+    /**
+     * Sends a request to the Backend to speak text via Cartesia
+     */
+    public speak(text: string) {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            console.warn("Cannot speak: Socket not connected");
+            return;
+        }
+
+        // Reset timing for a new sentence to avoid long delays
+        if (this.audioContext) {
+            this.nextStartTime = this.audioContext.currentTime + 0.1; 
+        }
+
+        console.log(`%c[Voice] Requesting TTS: "${text}"`, 'color: #ff00ff');
+        
+        this.socket.send(JSON.stringify({
+            type: "speak",
+            text: text,
+            contextId: `ctx_${Date.now()}` // Helps Cartesia group chunks
+        }));
     }
 
     /**
@@ -183,6 +229,49 @@ export class VoiceManager {
         }
 
         return result;
+    }
+
+    /**
+     * Decodes Base64 audio from Cartesia and schedules it seamlessly
+     */
+    private async scheduleAudioChunk(base64Data: string) {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+
+        try {
+            // A. Base64 -> Float32Array
+            const raw = window.atob(base64Data);
+            const len = raw.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = raw.charCodeAt(i);
+            }
+            const floatData = new Float32Array(bytes.buffer);
+
+            // B. Create AudioBuffer
+            const buffer = this.audioContext.createBuffer(1, floatData.length, 44100);
+            buffer.getChannelData(0).set(floatData);
+
+            // C. Schedule Playback
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(this.audioContext.destination);
+
+            // Ensure smooth playback without gaps
+            if (this.nextStartTime < this.audioContext.currentTime) {
+                this.nextStartTime = this.audioContext.currentTime;
+            }
+
+            source.start(this.nextStartTime);
+            this.nextStartTime += buffer.duration;
+
+        } catch (e) {
+            console.error("Error decoding audio chunk", e);
+        }
     }
 }
 
