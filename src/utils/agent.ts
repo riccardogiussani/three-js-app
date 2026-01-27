@@ -8,14 +8,14 @@ import * as THREE from 'three';
 
 export class AgentManager {
     private scene: THREE.Scene;
-    private baseUrl: string;
+    private httpUrl: string; // Separate HTTP URL for logic
 
     public onResponse: ((text: string) => void) | null = null;
 
     constructor(scene: THREE.Scene, baseUrl: string = 'http://localhost:3000') {
         this.scene = scene;
-        this.baseUrl = baseUrl;
-
+        this.httpUrl = baseUrl;
+        
         // Expose chat function globally for debugging/console usage
         (window as any).chat = this.sendMessage.bind(this);
         console.log(`%c[Agent] Initialized. Usage: chat("Move the cube")`, 'color: cyan');
@@ -25,9 +25,9 @@ export class AgentManager {
      * Main entry point to send a message to the AI
      */
     async sendMessage(text: string) {
-        console.log(`%c[Agent] Requesting: "${text}"...`, 'color: #888');
+        console.log(`%c[Agent] Sending: "${text}"...`, 'color: #888');
         try {
-            const response = await fetch(`${this.baseUrl}/chat/request`, {
+            const response = await fetch(`${this.httpUrl}/chat/query`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text })
@@ -36,6 +36,7 @@ export class AgentManager {
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
             const data = await response.json();
 
+            // If LLM keeps requiring actions and failing, we enter a loop?
             if (data.status === 'ACTION_REQUIRED') {
                 console.log('%c[Agent] AI wants to execute command:', 'color: orange', data.command);
                 try {
@@ -104,7 +105,7 @@ export class AgentManager {
     private async sendFeedback(toolCallId: string, success: boolean, details: string) {
         console.log(`%c[Agent] Sending Feedback (Success: ${success})...`, 'color: #888');
         try {
-            const response = await fetch(`${this.baseUrl}/chat/feedback`, {
+            const response = await fetch(`${this.httpUrl}/chat/result`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ toolCallId, success, details })
