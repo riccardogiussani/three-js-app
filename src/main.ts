@@ -17,6 +17,7 @@ import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';
 import { initEventManager, EventManager } from './utils/events.ts';
 import { initLoaderManager, LoaderManager } from './utils/model.ts';
+import { initEnvironmentManager, EnvironmentManager } from './utils/environment.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 //import { ButtonEvent } from './utils/controller.ts';
 import { initAgentManager, AgentManager } from './utils/agent.ts';
@@ -57,13 +58,14 @@ scene.add(directionalLight);
 const voiceManager: VoiceManager = initVoice(BFF_URL);
 const agentManager: AgentManager = initAgentManager(scene, BFF_URL);
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
-const controllerManager:ControllerManager = initControllers(scene, renderer);
-const interactionManager:InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
-const loaderManager:LoaderManager = initLoaderManager(scene, interactionManager);
+const controllerManager: ControllerManager = initControllers(scene, renderer);
+const interactionManager: InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
+const loaderManager: LoaderManager = initLoaderManager(scene, interactionManager);
+const envManager: EnvironmentManager = initEnvironmentManager(scene, renderer, camera); 
 const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
 
-const environmentPath = './models/environment.glb';
-loaderManager.create(environmentPath, false);
+//envManager.create('./envs/sample.ksplat');
+envManager.create('./envs/environment.glb');
 
 const modelPath = './models/v12_LOW.glb'; 
 loaderManager.create(modelPath);
@@ -233,6 +235,7 @@ function animate(time?: number) {
     controllerManager.update();
 
     stats.update();
+    envManager.update(); // if splat has sequence
 
     // Updates soft attachments (movement)
     uiManager.update();
