@@ -181,6 +181,7 @@ function onAReleased(event: THREE.Event){
         console.log("Hold released: Stopping Recording...");
         voiceManager.stopRecording();
         isRecordingState = false; // Reset state
+        chatMesh.userData.isFinal = true; 
     } else {
         console.log("Tap detected...");
         const textToSend = uiManager.handleSendMessage(chatMesh);
