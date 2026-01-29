@@ -67,8 +67,8 @@ const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
 //envManager.create('./envs/sample.ksplat');
 envManager.create('./envs/environment.glb');
 
-const modelPath = './models/v12_LOW.glb'; 
-loaderManager.create(modelPath);
+loaderManager.create('./models/v12_LOW.glb');
+loaderManager.create('./models/wrench.glb')
 
 uiManager.create(
     './menus/menu.html',
