@@ -1,2 +1,5 @@
 node_modules
 dist
+public/envs/sample.ksplat
+public/envs/sample.splat
+public/envs/sample.ply
