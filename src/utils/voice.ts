@@ -13,7 +13,11 @@ export class VoiceManager {
     private globalStream: MediaStream | null = null;
 
     private nextStartTime: number = 0;
+    private activeSources: AudioBufferSourceNode[] = [];
     private isPlaying: boolean = false;
+    
+    // NEW: Tracks the currently active speech request ID
+    private currentContextId: string | null = null;
 
     public isRecording: boolean = false;
     private baseUrl: string;
@@ -37,11 +41,10 @@ export class VoiceManager {
         if (this.socket && (this.socket.readyState === WebSocket.OPEN)) return;
 
         this.socket = new WebSocket(this.baseUrl);
-        this.socket.binaryType = 'arraybuffer'; // Setup for binary audio if needed
+        this.socket.binaryType = 'arraybuffer'; 
 
         this.socket.onopen = () => {
             console.log('%c[WS] Connected', 'color: #00ff00');
-            //this.onStatusChange?.("Connected");
         };
 
         this.socket.onmessage = async (event) => {
@@ -49,6 +52,13 @@ export class VoiceManager {
                 let data;
                 if (typeof event.data === 'string') {
                     data = JSON.parse(event.data);
+                    
+                    // --- NEW LOGIC: Filter Stale Chunks ---
+                    // If the chunk has a context_id and it doesn't match the current one, drop it.
+                    if (data.context_id && data.context_id !== this.currentContextId) {
+                         // console.debug("Dropping stale chunk", data.context_id);
+                         return;
+                    }
                     
                     if (data.type === 'chunk' && data.data) {
                         await this.scheduleAudioChunk(data.data);
@@ -66,7 +76,6 @@ export class VoiceManager {
                         if (this.onMessage) this.onMessage(data);
                     }
                 } else {
-                    // Handle raw binary if backend sends it (unlikely with current setup, but good practice)
                     return; 
                 }
             } catch (e) {
@@ -76,7 +85,6 @@ export class VoiceManager {
 
         this.socket.onclose = () => {
             console.warn('[WS] Disconnected');
-            //this.onStatusChange?.("Disconnected");
         };
 
         this.socket.onerror = (err) => console.error('[WS] Error:', err);
@@ -91,18 +99,47 @@ export class VoiceManager {
             return;
         }
 
-        // Reset timing for a new sentence to avoid long delays
+        // 1. Stop previous audio and invalidate previous chunks
+        this.stopPlayback();
+
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+
         if (this.audioContext) {
             this.nextStartTime = this.audioContext.currentTime + 0.1; 
         }
+
+        // 2. Generate and lock new Context ID
+        const contextId = `ctx_${Date.now()}`;
+        this.currentContextId = contextId;
 
         console.log(`%c[Voice] Requesting TTS: "${text}"`, 'color: #ff00ff');
         
         this.socket.send(JSON.stringify({
             type: "speak",
             text: text,
-            contextId: `ctx_${Date.now()}` // Helps Cartesia group chunks
+            contextId: contextId 
         }));
+    }
+
+    private stopPlayback() {
+        // Stop currently playing nodes
+        this.activeSources.forEach(source => {
+            try {
+                source.stop();
+            } catch (e) {}
+        });
+        this.activeSources = [];
+
+        // Reset buffer time
+        if (this.audioContext) {
+            this.nextStartTime = this.audioContext.currentTime;
+        }
+        this.isPlaying = false;
+        
+        // NEW: Invalidate the current context so incoming chunks from the network are ignored
+        this.currentContextId = null;
     }
 
     /**
@@ -119,18 +156,17 @@ export class VoiceManager {
     public async startRecording() {
         if (this.isRecording) return;
 
+        // Stops audio and invalidates context ID (so no TTS overlaps with mic)
+        this.stopPlayback();
+
         try {
-            // 1. Setup AudioContext (sample rate nativo del sistema)
             this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const nativeSampleRate = this.audioContext.sampleRate;
-            const targetSampleRate = 16000; // Standard per molti servizi STT (es. AssemblyAI)
+            const targetSampleRate = 16000; 
 
-            // 2. Acquisizione microfono
             this.globalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             this.input = this.audioContext.createMediaStreamSource(this.globalStream);
 
-            // 3. Setup Processor (Buffer 4096)
-            // Nota: ScriptProcessor è deprecato ma richiesto dalla logica dello script fornito
             this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
 
             this.input.connect(this.processor);
@@ -140,14 +176,8 @@ export class VoiceManager {
                 if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
                 const inputData = e.inputBuffer.getChannelData(0);
-
-                // A. Downsampling (es. 48k -> 16k)
                 const downsampledData = this.downsampleBuffer(inputData, nativeSampleRate, targetSampleRate);
-
-                // B. Conversione Float32 -> Int16 PCM
                 const pcmData = this.floatTo16BitPCM(downsampledData);
-
-                // C. Invio dati
                 this.socket.send(pcmData.buffer);
             };
 
@@ -188,9 +218,6 @@ export class VoiceManager {
 
     // --- Helper Functions ---
 
-    /**
-     * Converte Float32Array in Int16Array
-     */
     private floatTo16BitPCM(input: Float32Array): Int16Array {
         const output = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
@@ -200,9 +227,6 @@ export class VoiceManager {
         return output;
     }
 
-    /**
-     * Riduce il sample rate (es. da 44100/48000 a 16000)
-     */
     private downsampleBuffer(buffer: Float32Array, inputSampleRate: number, outputSampleRate: number): Float32Array {
         if (outputSampleRate === inputSampleRate) return buffer;
 
@@ -216,7 +240,6 @@ export class VoiceManager {
         while (offsetResult < result.length) {
             const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
             
-            // Media semplice per downsampling (rudimentale ma veloce)
             let accum = 0, count = 0;
             for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
                 accum += buffer[i];
@@ -231,9 +254,6 @@ export class VoiceManager {
         return result;
     }
 
-    /**
-     * Decodes Base64 audio from Cartesia and schedules it seamlessly
-     */
     private async scheduleAudioChunk(base64Data: string) {
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -243,7 +263,6 @@ export class VoiceManager {
         }
 
         try {
-            // A. Base64 -> Float32Array
             const raw = window.atob(base64Data);
             const len = raw.length;
             const bytes = new Uint8Array(len);
@@ -252,16 +271,18 @@ export class VoiceManager {
             }
             const floatData = new Float32Array(bytes.buffer);
 
-            // B. Create AudioBuffer
             const buffer = this.audioContext.createBuffer(1, floatData.length, 44100);
             buffer.getChannelData(0).set(floatData);
 
-            // C. Schedule Playback
             const source = this.audioContext.createBufferSource();
             source.buffer = buffer;
             source.connect(this.audioContext.destination);
 
-            // Ensure smooth playback without gaps
+            this.activeSources.push(source);
+            source.onended = () => {
+                this.activeSources = this.activeSources.filter(s => s !== source);
+            };
+
             if (this.nextStartTime < this.audioContext.currentTime) {
                 this.nextStartTime = this.audioContext.currentTime;
             }
