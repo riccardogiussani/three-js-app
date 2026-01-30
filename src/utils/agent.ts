@@ -1,129 +1,99 @@
 /**
  * agent.ts
- * * Manages AI interaction handling network requests to the backend
- * and executing scene commands (move, color, etc.).
+ * Manages Scene Logic and AI Commands.
+ * Uses SocketManager for transport.
  */
-
 import * as THREE from 'three';
+import { SocketManager } from "./sockett";
 
 export class AgentManager {
     private scene: THREE.Scene;
-    private httpUrl: string; // Separate HTTP URL for logic
-
+    private socketManager: SocketManager;
+    
+    // Callbacks
     public onResponse: ((text: string) => void) | null = null;
 
-    constructor(scene: THREE.Scene, baseUrl: string = 'http://localhost:3000') {
+    constructor(scene: THREE.Scene, socketManager: SocketManager) {
         this.scene = scene;
-        this.httpUrl = baseUrl;
-        
-        // Expose chat function globally for debugging/console usage
+        this.socketManager = socketManager;
+
+        // Subscribe to Agent events
+        this.socketManager.onAgentResponse = (text) => this.handleAgentResponse(text);
+        this.socketManager.onAgentAction = (cmd, id) => this.handleAgentAction(cmd, id);
+
         (window as any).chat = this.sendMessage.bind(this);
-        console.log(`%c[Agent] Initialized. Usage: chat("Move the cube")`, 'color: cyan');
     }
 
     /**
-     * Main entry point to send a message to the AI
+     * Sends a text query to the Agent via WebSocket
      */
-    async sendMessage(text: string) {
-        console.log(`%c[Agent] Sending: "${text}"...`, 'color: #888');
-        try {
-            const response = await fetch(`${this.httpUrl}/chat/query`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
-            });
-            
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
-            const data = await response.json();
+    public sendMessage(text: string) {
+        console.log(`%c[Agent] Sending: "${text}"`, 'color: #888');
+        this.socketManager.send({
+            type: 'agent_query',
+            message: text
+        });
+    }
 
-            // If LLM keeps requiring actions and failing, we enter a loop?
-            if (data.status === 'ACTION_REQUIRED') {
-                console.log('%c[Agent] AI wants to execute command:', 'color: orange', data.command);
-                try {
-                    // Execute the command locally using internal logic
-                    const resultDetails = await this.handleCommand(data.command.payload);
-                    await this.sendFeedback(data.toolCallId, true, resultDetails);
-                } catch (execError: any) {
-                    console.warn('[Agent] Client execution failed:', execError);
-                    await this.sendFeedback(data.toolCallId, false, execError.message || "Unknown client error");
-                }
-            } else {
-                console.log('%c[Agent] AI Response:', 'color: #00ff00', data.text);
-                if (this.onResponse && data.text) {
-                    this.onResponse(data.text);
-                }
-            }
-        } catch (err) {
-            console.error('[Agent] Request failed:', err);
+    private handleAgentResponse(text: string) {
+        console.log('%c[Agent] Response:', 'color: #00ff00', text);
+    }
+
+    private async handleAgentAction(command: any, toolCallId: string) {
+        const { payload } = command;
+        console.log('%c[Agent] Executing Command:', 'color: orange', payload);
+
+        try {
+            const resultDetails = await this.executeSceneCommand(payload);
+            
+            // Send Success Feedback
+            this.socketManager.send({
+                type: 'agent_feedback', // Backend must handle this type!
+                toolCallId: toolCallId,
+                success: true,
+                details: resultDetails
+            });
+
+        } catch (error: any) {
+            console.warn('[Agent] Execution failed:', error);
+            
+            // Send Failure Feedback
+            this.socketManager.send({
+                type: 'agent_feedback',
+                toolCallId: toolCallId,
+                success: false,
+                details: error.message || "Unknown error"
+            });
         }
     }
 
-    /**
-     * Internal handler for scene manipulation commands
-     */
-    private async handleCommand(payload: any): Promise<string> {
+    private async executeSceneCommand(payload: any): Promise<string> {
         const { target, action, value } = payload;
-
-        // Find object within the managed scene
         const obj = this.scene.getObjectByName(target);
-        if (!obj) throw new Error(`Object '${target}' not found in scene`);
+        
+        if (!obj) throw new Error(`Object '${target}' not found`);
 
-        // Perform Action
         if (action === 'move') {
             const [x, y, z] = value.split(',').map(Number);
-            
-            // Example using Promise (can be replaced with GSAP/Tween)
-            return new Promise((resolve) => {
-                obj.position.set(x, y, z);
-                // Optional: Force matrix update if autoUpdate is false
-                obj.updateMatrix(); 
-                resolve(`Moved ${target} to ${x},${y},${z}`);
-            });
+            obj.position.set(x, y, z);
+            obj.updateMatrix();
+            return `Moved ${target} to ${x},${y},${z}`;
         }
 
         if (action === 'color') {
             if ((obj as any).material) {
-                // Handle array of materials or single material
-                const material = (obj as any).material;
-                if (Array.isArray(material)) {
-                    material.forEach(m => m.color.set(value));
-                } else {
-                    material.color.set(value);
-                }
-                return `Changed ${target} color to ${value}`;
-            } else {
-                throw new Error(`${target} has no material to color`);
+                const mat = (obj as any).material;
+                if (Array.isArray(mat)) mat.forEach(m => m.color.set(value));
+                else mat.color.set(value);
+                return `Colored ${target} to ${value}`;
             }
+            throw new Error(`${target} has no material`);
         }
 
         throw new Error(`Unknown action: ${action}`);
     }
-
-    /**
-     * Sends the feedback loop back to the LLM/Backend
-     */
-    private async sendFeedback(toolCallId: string, success: boolean, details: string) {
-        console.log(`%c[Agent] Sending Feedback (Success: ${success})...`, 'color: #888');
-        try {
-            const response = await fetch(`${this.httpUrl}/chat/result`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ toolCallId, success, details })
-            });
-            const data = await response.json();
-            console.log('%c[Agent] Final AI Response:', 'color: #00ff00', data.text);
-            if (this.onResponse && data.text) {
-                this.onResponse(data.text);
-            }
-        } catch (err) {
-            console.error('[Agent] Feedback failed:', err);
-        }
-    }
 }
 
-/**
- * Factory function to initialize the AgentManager.
- */
-export function initAgentManager(scene: THREE.Scene, baseUrl?: string): AgentManager {
-    return new AgentManager(scene, baseUrl);
+export function initAgentManager(scene: THREE.Scene, socket: SocketManager): AgentManager {
+    return new AgentManager(scene, socket);
 }

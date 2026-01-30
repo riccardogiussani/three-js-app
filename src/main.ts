@@ -13,17 +13,19 @@
 
 import * as THREE from 'three';
 
+import { SocketManager, initSocketManager } from './utils/sockett.ts';
 import { initUI, UIManager } from './utils/ui.ts';
 import { initInteraction, InteractionManager } from './utils/interaction.ts';
 import { initEventManager, EventManager } from './utils/events.ts';
 import { initLoaderManager, LoaderManager } from './utils/model.ts';
+import { initGraphManager, GraphManager } from './utils/graph.ts';
 import { initEnvironmentManager, EnvironmentManager } from './utils/environment.ts';
 import { initControllers, ControllerManager } from './utils/controller.ts';
 //import { ButtonEvent } from './utils/controller.ts';
 import { initAgentManager, AgentManager } from './utils/agent.ts';
 import { initVoice, VoiceManager } from './utils/voice.ts';
 
-const BFF_URL = 'http://localhost:3000';
+const BFF_URL = 'ws://localhost:3000';
 
 let chatMesh: any = null;
 let pressTimer: any = null;
@@ -55,8 +57,10 @@ directionalLight.position.set(1, 1, 1);
 scene.add(directionalLight);
 
 // Setup scene Managers
-const voiceManager: VoiceManager = initVoice(BFF_URL);
-const agentManager: AgentManager = initAgentManager(scene, BFF_URL);
+const socketManager: SocketManager = initSocketManager(BFF_URL);
+const voiceManager: VoiceManager = initVoice(socketManager);
+const agentManager: AgentManager = initAgentManager(scene, socketManager);
+const graphManager: GraphManager = initGraphManager(socketManager);
 const eventManager: EventManager = initEventManager('*'); // * for development purposes, set to ip address for
 const controllerManager: ControllerManager = initControllers(scene, renderer);
 const interactionManager: InteractionManager = initInteraction(scene, renderer, camera, controllerManager);
@@ -67,8 +71,12 @@ const uiManager: UIManager = initUI(scene, renderer, camera, controllerManager);
 //envManager.create('./envs/sample.ksplat');
 envManager.create('./envs/environment.glb');
 
-loaderManager.create('./models/v12_LOW.glb');
+loaderManager.create('./models/v12_LOW.glb')
+    .then((model) => { graphManager.push(model); })
+    .catch((err) => console.error("Failed to load:", err));
 loaderManager.create('./models/wrench.glb')
+    .then((model) => { graphManager.push(model); })
+    .catch((err) => console.error("Failed to load:", err));
 
 uiManager.create(
     './menus/menu.html',
@@ -97,9 +105,9 @@ uiManager.attach(
 chatPromise.then((mesh) => {
     if (!mesh) return;
     chatMesh = mesh;
-    voiceManager.onPartialTranscription = (text:string) => { uiManager.handlePartialTranscription(mesh, text)};
-    voiceManager.onFullTranscription = (text:string) => { uiManager.handleFullTranscription(mesh, text)};
-    agentManager.onResponse = (text:string) => {voiceManager.speak(text)};
+    socketManager.onPartialTranscription = (text:string) => { uiManager.handlePartialTranscription(mesh, text)};
+    socketManager.onFullTranscription = (text:string) => { uiManager.handleFullTranscription(mesh, text)};
+    socketManager.onAgentResponse = (text:string) => {voiceManager.speak(text)};
 });
 
 // #endregion
@@ -210,7 +218,6 @@ function onGenericButtonPressed(event:any){
 export async function startVRSession(session: XRSession): Promise<void> {
     console.log("Starting VR Session...");
     await renderer.xr.setSession(session);
-    await voiceManager.initVoice();
     renderer.setClearColor(0x000000);
 }
 
